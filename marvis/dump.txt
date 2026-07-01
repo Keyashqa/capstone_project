@@ -1,0 +1,444 @@
+================================================================================
+  MARVIS — Personal AI Orchestrator  |  End-to-End Tutorial & Sample Run
+  Capstone Project | Date: 2026-07-01
+================================================================================
+
+WHAT IS MARVIS?
+---------------
+Marvis is an AI orchestrator that:
+  1. Accepts a natural-language task from you ("Write a tweet…")
+  2. Finds the right specialist agent from a marketplace
+  3. Shows you the price, waits for your PIN to authorise payment
+  4. Puts funds in ESCROW (never paid upfront)
+  5. Dispatches the specialist (local Gemma via Ollama)
+  6. Verifies the work deterministically (≤280 chars, doc created, etc.)
+  7. Shows you the result + advisory AI score
+  8. Waits for your second PIN to release the completion payment
+  9. Settles the escrow, emits a receipt
+
+THREE SERVERS THAT MUST BE RUNNING
+------------------------------------
+  Terminal 1:  ./run_marvis.sh     → http://localhost:8000  (ADK agent)
+  Terminal 2:  ./run_broker.sh     → http://localhost:8002  (marketplace)
+  Terminal 3:  ./run_proxy.sh      → http://localhost:8003  (proxy stub)
+  Terminal 4:  ./run_frontend.sh   → http://localhost:5173  (React UI)
+
+QUICK HEALTH CHECK (run these in a new terminal)
+-------------------------------------------------
+  curl http://localhost:8000/health
+  → {"status":"ok"}
+
+  curl http://localhost:8000/marvis/health
+  → {"status":"ok","service":"marvis","model":"ollama/gemma2:2b"}
+
+  curl http://localhost:8002/.well-known/agent-card
+  → {"name":"Marvis Broker","description":"...","public_key":{...},...}
+
+  curl http://localhost:8003/health
+  → {"status":"ok","service":"marvis-proxy","note":"Stub..."}
+
+MARKETPLACE CATALOG (what skills are available)
+------------------------------------------------
+  curl http://localhost:8002/.well-known/skills
+  → [
+      {
+        "skill_id": "skill-doc-writer",
+        "agent_name": "DocWriter",
+        "display_name": "Doc Writer",
+        "description": "Writes content (tweets, scripts, articles) and saves as a Google Doc.",
+        "specialties": ["doc-writing","content-writing","twitter","social-media"],
+        "pricing": { "base_fee_cents": 50, "completion_fee_cents": 100 },
+        "required_capabilities": [{ "mcp_server":"gdocs","tool_name":"create_doc" }]
+      },
+      {
+        "skill_id": "skill-doc-reader",
+        "agent_name": "DocReader",
+        "display_name": "Doc Reader",
+        "description": "Reads and summarises an existing Google Doc.",
+        "specialties": ["doc-reading","research","summarisation"],
+        "pricing": { "base_fee_cents": 25, "completion_fee_cents": 50 },
+        "required_capabilities": [{ "mcp_server":"gdocs","tool_name":"get_doc_content" }]
+      }
+    ]
+
+================================================================================
+  OPTION A — USE THE REACT WEB UI (Recommended for demo)
+================================================================================
+
+STEP 1: Open http://localhost:5173 in your browser
+
+STEP 2: Click "Don't have an account? Register"
+  Fill in:
+    Email:    yourname@example.com
+    Password: anything (e.g. test1234)
+    PIN:      4–6 digits you'll remember (e.g. 1234)
+              ← this PIN authorises payments; keep it handy
+
+STEP 3: You land on the Wallet page.
+  Top up your balance first — click one of the green buttons:
+    [+ $5.00]  [+ $10.00]  [+ $20.00]  [+ $50.00]
+  The flagship task costs $1.50 total ($0.50 base + $1.00 completion).
+  Top up at least $5.00 to have plenty of room.
+
+STEP 4: Click "Chat with Marvis →"
+
+STEP 5: Type the flagship input in the text box at the bottom:
+
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  Write a tweet about my Marvis launch and save it as a Twitter      │
+  │  script in Google Docs.                                             │
+  └─────────────────────────────────────────────────────────────────────┘
+
+  Press Enter or click "Send".
+
+STEP 6: Marvis parses your request (Gemma runs locally, takes ~10s).
+  You'll see:
+    Agent: "Task parsed:
+              type: doc_writing
+              inputs: { topic: 'Marvis launch', tone: 'casual', ... }
+              criteria: 3 checks"
+
+STEP 7: Marvis discovers DocWriter (rule-based, no LLM on routing path).
+  You'll see:
+    Agent: "Found 1 specialist(s):
+              • Doc Writer (skill-doc-writer) — Writes content..."
+    Agent: "Selected: Doc Writer (DocWriter)
+              Base fee: $0.50   Completion fee: $1.00"
+
+STEP 8: A2UI HIRE CARD appears showing:
+  ┌─────────────────────────────────┐
+  │  Hire Confirmation              │
+  │  ──────────────────────────     │
+  │  Specialist:   DocWriter        │
+  │  Base fee:     $0.50 (now)      │
+  │  Completion:   $1.00 (delivery) │
+  │  Total held:   $1.50 in escrow  │
+  │  ──────────────────────────     │
+  │  Enter your PIN to authorise    │
+  └─────────────────────────────────┘
+
+  A PIN MODAL pops up: "🔐 Confirm Hire"
+  → Enter your PIN (e.g. 1234) and click Confirm
+
+STEP 9: Marvis moves $1.50 from your wallet → escrow:task-xxxx
+  (Funds are LOCKED, not yet paid to agent)
+  You'll see:
+    Agent: "CartMandate verified."
+    Agent: "$1.50 moved to escrow:... | Booking ID: bkg-..."
+
+STEP 10: Marvis mints a CapabilityGrant for DocWriter:
+  → DocWriter can ONLY call create_doc (read tools blocked by allowlist)
+  You'll see:
+    Agent: "Capability grant minted: ... | Allowed: create_doc only"
+
+STEP 11: DocWriter (Gemma) runs and writes your tweet (~15–30s):
+  You'll see a typing indicator (•••), then:
+    Agent: "Collected result from DocWriter:
+              Output: 🎉 Just launched Marvis — my AI orchestrator that hires...
+              Doc ID: 1BxKq3... (Google Doc created)"
+
+  NOTE: If Google OAuth hasn't been done yet, create_doc returns "created"
+  (mock) instead of a real doc ID. See GOOGLE DOCS SETUP below.
+
+STEP 12: Marvis verifies the work:
+    Deterministic checks:
+      ✓ tweet ≤ 280 chars
+      ✓ create_doc was called
+      ✓ doc_id is non-empty
+    Advisory Gemma score: 7/10 (example)
+
+STEP 13: A2UI PAYOUT CARD appears:
+  ┌─────────────────────────────────┐
+  │  Work Verification              │
+  │  ──────────────────────────     │
+  │  Specialist:   DocWriter        │
+  │  Advisory score: 7/10           │
+  │  Output preview:                │
+  │  🎉 Just launched Marvis — my   │
+  │  AI orchestrator that hires...  │
+  │  Doc saved: 1BxKq3...           │
+  │  ──────────────────────────     │
+  │  Completion fee: $1.00          │
+  │  Enter PIN to approve payout    │
+  └─────────────────────────────────┘
+
+  Another PIN MODAL: "🔐 Approve Payout"
+  → Enter your PIN again and click Confirm
+
+STEP 14: Marvis releases escrow → agent:DocWriter
+  You'll see:
+    Agent: "$1.50 released to agent:DocWriter | Journal: ..."
+    Agent: "Escrow settled: escrow:task-... == 0. HiringTxn closed."
+    Agent: (Receipt A2UI card)
+
+  ┌─────────────────────────────────┐
+  │  ✅ Task Complete               │
+  │  ──────────────────────────     │
+  │  Booking:  bkg-abc123           │
+  │  Agent:    DocWriter            │
+  │  Total paid: $1.50              │
+  │  Doc ID:   1BxKq3...            │
+  │  ──────────────────────────     │
+  │  Output:                        │
+  │  🎉 Just launched Marvis...     │
+  └─────────────────────────────────┘
+
+================================================================================
+  OPTION B — USE THE REST API (curl / Postman / Insomnia)
+================================================================================
+
+--- STEP 1: Register ---
+curl -X POST http://localhost:8000/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"test1234","pin":"1234"}'
+
+Response:
+{
+  "token": "eae98af99fd097d475e9...",
+  "user_id": "usr-abc123",
+  "email": "you@example.com",
+  "balance_cents": 0
+}
+
+--- STEP 2: Login (if already registered) ---
+curl -X POST http://localhost:8000/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"test1234"}'
+
+--- STEP 3: Top up wallet ---
+curl -X POST http://localhost:8000/wallet/topup \
+  -H 'Content-Type: application/json' \
+  -d '{"token":"<YOUR_TOKEN>","amount_cents":50000}'
+
+Response:
+{ "balance_cents": 50000 }   ← $500.00 loaded
+
+--- STEP 4: Check balance ---
+curl "http://localhost:8000/wallet/balance?token=<YOUR_TOKEN>"
+
+Response:
+{
+  "balance_cents": 50000,
+  "transactions": [
+    { "delta_cents": 50000, "reason": "topup", "created_at": "..." }
+  ]
+}
+
+--- STEP 5: Create ADK session ---
+curl -X POST http://localhost:8000/adk-sessions \
+  -H 'Content-Type: application/json' \
+  -d '{"token":"<YOUR_TOKEN>"}'
+
+Response:
+{ "adk_session_id": "61bc9b5b64a740d488b225aca96e7e14" }
+
+--- STEP 6: Send your task (SSE stream) ---
+curl -X POST http://localhost:8000/run_sse \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "app_name": "app",
+    "user_id": "<YOUR_USER_ID>",
+    "session_id": "<SESSION_ID>",
+    "streaming": true,
+    "new_message": {
+      "role": "user",
+      "parts": [{"text": "Write a tweet about my Marvis launch and save it as a Twitter script in Google Docs."}]
+    }
+  }'
+
+(Stream will emit SSE events — use the React UI for the best experience)
+
+--- STEP 7: When the PIN gate fires, verify PIN ---
+The SSE stream emits a functionCall event like:
+  { "functionCall": { "name": "adk_request_input", "id": "payment_auth", ... } }
+
+Then POST:
+curl -X POST http://localhost:8000/auth/verify-pin \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "token": "<YOUR_TOKEN>",
+    "pin": "1234",
+    "adk_session_id": "<SESSION_ID>",
+    "interrupt_id": "payment_auth"
+  }'
+
+Response:
+{ "ok": true }
+
+Then resume the stream by sending:
+  functionResponse: { id: "payment_auth", name: "adk_request_input", response: { result: "confirmed" } }
+
+--- STEP 8: Same for payout PIN (interrupt_id = "payout_auth") ---
+
+================================================================================
+  OTHER SAMPLE INPUTS TO TRY
+================================================================================
+
+1. WRITE A TWEET (flagship):
+   "Write a tweet about my Marvis launch and save it as a Twitter script in Google Docs."
+   → Selects: DocWriter | Cost: $1.50 | Tool: create_doc
+
+2. WRITE A BLOG INTRO:
+   "Write a short blog post introduction about AI agents and save it as a Google Doc."
+   → Selects: DocWriter | Cost: $1.50 | Tool: create_doc
+
+3. WRITE SOCIAL MEDIA CONTENT:
+   "Write an Instagram caption for our new product launch and save it to Google Docs."
+   → Selects: DocWriter | Cost: $1.50 | Tool: create_doc
+
+4. READ A DOCUMENT (requires an existing Google Doc ID):
+   "Summarise the document at doc ID 1BxKq3YourDocIdHere."
+   → Selects: DocReader | Cost: $0.75 | Tool: get_doc_content
+
+5. CANCELLATION FLOW (test refund path):
+   Start any task, then when the hire PIN modal appears → click Cancel
+   → Marvis routes to cancelled_terminal; NO escrow held; wallet untouched.
+
+6. VERIFY FAIL (hard_fail path):
+   Internally triggered when DocWriter returns output > 280 chars or create_doc fails.
+   → Marvis refunds completion fee ($1.00), keeps base fee ($0.50), shows refund receipt.
+
+================================================================================
+  WHAT EACH SPECIALIST CAN (AND CANNOT) DO
+================================================================================
+
+  DocWriter (skill-doc-writer):
+    ✅ ALLOWED:   create_doc (Google Docs — create new document)
+    ❌ BLOCKED:   get_doc_content (no read access)
+    ❌ BLOCKED:   any other MCP tool
+    The CapabilityGrant is minted fresh per task, expires in 5 minutes,
+    and is revoked immediately after the specialist finishes.
+
+  DocReader (skill-doc-reader):
+    ✅ ALLOWED:   get_doc_content (Google Docs — read existing document)
+    ❌ BLOCKED:   create_doc (no write access)
+    ❌ BLOCKED:   any other MCP tool
+
+  This read-vs-write split is the least-privilege scoping demonstration.
+
+================================================================================
+  GOOGLE DOCS SETUP (one-time, optional for real doc creation)
+================================================================================
+
+By default, create_doc returns a mock doc ID ("created") without real OAuth.
+To create actual Google Docs:
+
+1. Get a Google OAuth client:
+   - Go to console.cloud.google.com → APIs & Services → Credentials
+   - Create OAuth 2.0 Client ID (Desktop app)
+   - Download client_secret.json (NEVER commit this)
+
+2. Place it at:
+   mcp-test/google_workspace_mcp/client_secret.json
+
+3. Run one-time consent (in the marvis/ directory):
+   uv run python ../mcp-test/google_workspace_mcp/create_doc.py
+
+4. A browser tab opens → sign in with Google → grant Docs access
+   Token saved to: mcp-test/google_workspace_mcp/token.json  (gitignored)
+
+5. Restart ./run_marvis.sh — subsequent create_doc calls will create real Docs.
+
+================================================================================
+  FINANCIAL FLOW EXPLAINED
+================================================================================
+
+  User wallet:      $500.00 (after topup)
+
+  [HIRE — PIN gate #1]
+  User wallet:      $498.50  (-$1.50)
+  escrow:task-xxx:  $1.50    (+$1.50)   ← locked during work
+
+  [SPECIALIST RUNS]  (money stays in escrow)
+
+  [VERIFY PASS + PAYOUT — PIN gate #2]
+  escrow:task-xxx:  $0.00    (-$1.50)   ← drained to zero
+  agent:DocWriter:  $1.50    (+$1.50)   ← specialist paid
+
+  [VERIFY FAIL path (no payout PIN needed)]
+  escrow:task-xxx:  $0.50    (base kept — non-refundable)
+  agent:DocWriter:  $0.50    (base fee only)
+  User wallet:      $499.50  (+$1.00 completion refunded)
+
+  Global ledger sum across ALL accounts: 0  (double-entry invariant)
+  Every entry is hash-chained (SHA-256) — tamper-detectable.
+
+================================================================================
+  MILESTONE DONE-TESTS (all passing as of 2026-07-01)
+================================================================================
+
+  M0:  curl :8000/health && :8002/.well-known/agent-card && :8003/health  → all 200
+  M3:  Flagship input → AgentCard.agent_name == "DocWriter" (deterministic)
+  M5:  Gemma output ≤ 280 chars; mock create_doc called correctly
+  M6:  DocWriter grant cannot call get_doc_content (PermissionError raised)
+  M7:  revoke_by_task removes grant; expired grant returns "grant expired"
+  M8:  verify_work: happy path → checks_pass; long tweet → hard_fail; no doc → hard_fail
+  M9:  hold→release→settle; sum==0; hash chain valid; refund path correct
+  M10: Full loop simulation (no HITL): intake→select→escrow→dispatch→verify→settle PASS
+
+================================================================================
+  ARCHITECTURE AT A GLANCE
+================================================================================
+
+  Browser / curl
+       │
+       ▼ HTTP :8000
+  ┌──────────────────────────────────────────────────┐
+  │  Marvis Agent  (ADK Workflow graph)              │
+  │                                                  │
+  │  intake_task ──→ discover ──→ select             │
+  │       ──→ [PIN#1] authorize_base_payment         │
+  │       ──→ create_hire_checkout (UCP CartMandate) │
+  │       ──→ verify_hire_cart                       │
+  │       ──→ pay_base_into_escrow (AP2 SD-JWT)      │
+  │       ──→ grant_capability (CapabilityGrant)     │
+  │       ──→ dispatch_to_specialist                 │
+  │              │                                   │
+  │              ▼  in-process                       │
+  │         ┌─────────────────────────────────┐      │
+  │         │  Specialist Runtime (Gemma)     │      │
+  │         │  wears SkillCard instruction    │      │
+  │         │  calls gdocs MCP via grant      │      │
+  │         └─────────────────────────────────┘      │
+  │       ──→ collect_result                         │
+  │       ──→ revoke_capability                      │
+  │       ──→ verify_work (det + advisory Gemma)     │
+  │       ──→ [PIN#2] approve_payout                 │
+  │       ──→ pay_completion                         │
+  │       ──→ settle_escrow                          │
+  │       ──→ receipt_terminal                       │
+  └──────────────────────────────────────────────────┘
+       │
+       ▼ HTTP :8002
+  ┌──────────────────┐      ▼ HTTP :8003
+  │  Broker Server   │  ┌───────────────────┐
+  │  GET /.well-known│  │  Scoped MCP Proxy │
+  │  /skills         │  │  (stub for M0-M11)│
+  │  /agent-card     │  └───────────────────┘
+  │  POST /mcp       │
+  │  POST /mandates/ │
+  │       /verify    │
+  └──────────────────┘
+
+================================================================================
+  QUICK TEST WITHOUT THE UI (3 commands)
+================================================================================
+
+# 1. Register + topup
+TOKEN=$(curl -s -X POST localhost:8000/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"q@q.com","password":"q","pin":"1234"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+curl -s -X POST localhost:8000/wallet/topup \
+  -H 'Content-Type: application/json' \
+  -d "{\"token\":\"$TOKEN\",\"amount_cents\":50000}"
+
+# 2. Check wallet balance
+curl -s "localhost:8000/wallet/balance?token=$TOKEN"
+
+# 3. Browse to http://localhost:5173, log in with q@q.com / q, and chat!
+
+================================================================================
+  END OF TUTORIAL
+================================================================================

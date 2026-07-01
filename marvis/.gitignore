@@ -1,0 +1,20 @@
+.env
+*.db
+*.db-wal
+*.db-shm
+__pycache__/
+*.pyc
+.venv/
+dist/
+*.egg-info/
+app/_keys/*.json
+broker_server/_keys/*.json
+
+# Google OAuth tokens (never commit)
+mcp-test/google_workspace_mcp/.credentials/
+mcp-test/google_workspace_mcp/client_secret*.json
+google_workspace_mcp/.credentials/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

@@ -1,0 +1,44 @@
+[project]
+name = "marvis"
+version = "0.1.0"
+description = "Marvis — personal orchestrator that hires, pays, provisions, verifies, and settles with marketplace specialist agents."
+requires-python = ">=3.11,<3.14"
+
+dependencies = [
+    "google-adk[gcp]>=2.0.0,<3.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "httpx>=0.28.0",
+    "ap2",
+    "ucp-sdk",
+    "mcp>=1.0.0",
+    "ollama>=0.4.0",
+    "jwcrypto>=1.5.6",
+    "cryptography>=43.0.0",
+    "pydantic>=2.0.0",
+    "bcrypt>=4.0.0",
+    "python-dotenv>=1.2.2",
+    "a2ui-agent-sdk>=0.2.4",
+    "opentelemetry-instrumentation-google-genai>=0.1.0,<1.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2,<10.0.0",
+    "pytest-asyncio>=1.0.0,<2.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+ap2 = { git = "https://github.com/google-agentic-commerce/AP2.git", rev = "main" }
+ucp-sdk = { git = "https://github.com/Universal-Commerce-Protocol/python-sdk.git", rev = "main" }
+
+[tool.hatch.build.targets.wheel]
+packages = ["app", "broker_server", "proxy_server"]
+
+[tool.pytest.ini_options]
+pythonpath = "."
+asyncio_mode = "auto"
