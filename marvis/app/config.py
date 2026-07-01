@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 
 _ROOT = Path(__file__).parent.parent
 load_dotenv(_ROOT / ".env", override=False)
+# Fall back to mcp-test credentials so the working OAuth session is reused
+load_dotenv(_ROOT.parent / "mcp-test" / "google_workspace_mcp" / ".env", override=False)
 
 
 def _get(key: str, default: str = "") -> str:
@@ -51,4 +53,4 @@ MCP_SINGLE_USER_MODE: str = _get("MCP_SINGLE_USER_MODE", "true")
 USER_GOOGLE_EMAIL: str = _get("USER_GOOGLE_EMAIL", "")
 
 # ── Specialist dispatch ────────────────────────────────────────────────────────
-DISPATCH_TIMEOUT_SECONDS: int = int(_get("DISPATCH_TIMEOUT_SECONDS", "20"))
+DISPATCH_TIMEOUT_SECONDS: int = int(_get("DISPATCH_TIMEOUT_SECONDS", "120"))

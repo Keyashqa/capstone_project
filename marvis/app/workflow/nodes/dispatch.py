@@ -55,7 +55,10 @@ async def dispatch_to_specialist(node_input: dict[str, Any]) -> Any:
         return Event(
             output=node_input,
             route="dispatch_failed",
-            content=_content(f"Specialist timed out after {DISPATCH_TIMEOUT_SECONDS}s."),
+            content=_content(
+                f"Specialist timed out after {DISPATCH_TIMEOUT_SECONDS}s. "
+                f"(If Ollama is slow, set DISPATCH_TIMEOUT_SECONDS=180 in marvis/.env)"
+            ),
         )
     except PermissionError as exc:
         return Event(

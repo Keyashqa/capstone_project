@@ -123,37 +123,73 @@ async def _call_create_doc(
     title: str,
     content: str,
 ) -> str | None:
-    """Check grant allowlist then call create_doc via the in-proc gdocs session."""
+    """Check grant, create doc, then populate a content tab — mirrors create_doc.py exactly."""
     allowed, reason = grant_registry.check_and_use(
         grant.grant_token, "create_doc", {"title": title, "content": content}
     )
     if not allowed:
         raise PermissionError(f"create_doc denied by grant: {reason}")
 
-    from app.capability.gdocs_session import get_gdocs_session
-    session = get_gdocs_session()
-    if not session._started:
-        await session.start()
-
-    tool_args: dict[str, Any] = {"title": title}
-    if USER_GOOGLE_EMAIL:
-        tool_args["user_google_email"] = USER_GOOGLE_EMAIL
-    result = await session.call_tool("create_doc", tool_args)
-    text = "".join(getattr(b, "text", "") for b in result.content)
-
-    # Extract doc_id from result text
+    from app.capability.gdocs_session import GDocsSession
     import re
-    for pattern in [
-        r'["\'](?:documentId|document_id)["\']\s*[:=]\s*["\']([a-zA-Z0-9_-]+)["\']',
-        r'\(ID:\s*([a-zA-Z0-9_-]+)\)',
-        r'/document/d/([a-zA-Z0-9_-]+)',
-    ]:
-        m = re.search(pattern, text)
-        if m:
-            return m.group(1)
 
-    # If doc was created but we couldn't parse the id, still signal success
-    return "created"
+    def _extract_doc_id(text: str) -> str | None:
+        for pat in [
+            r'["\'](?:documentId|document_id)["\']\s*[:=]\s*["\']([a-zA-Z0-9_-]+)["\']',
+            r'\(ID:\s*([a-zA-Z0-9_-]+)\)',
+            r'/document/d/([a-zA-Z0-9_-]+)',
+        ]:
+            m = re.search(pat, text)
+            if m:
+                return m.group(1)
+        return None
+
+    def _extract_tab_id(text: str) -> str | None:
+        for pat in [
+            r'["\']tab_id["\']\s*:\s*["\']([a-zA-Z0-9_.\-]+)["\']',
+            r'Tab ID:\s*([a-zA-Z0-9_.\-]+)',
+        ]:
+            m = re.search(pat, text)
+            if m:
+                return m.group(1).rstrip(".")
+        return None
+
+    email_arg = {"user_google_email": USER_GOOGLE_EMAIL} if USER_GOOGLE_EMAIL else {}
+
+    async with GDocsSession() as session:
+        # Step 1: create the empty doc
+        create_result = await session.call_tool("create_doc", {"title": title, **email_arg})
+        create_text = "".join(getattr(b, "text", "") for b in create_result.content)
+        doc_id = _extract_doc_id(create_text)
+
+        if not doc_id:
+            return "created"
+
+        if not content:
+            return doc_id
+
+        # Step 2: create a "Content" tab
+        tab_result = await session.call_tool(
+            "manage_doc_tab",
+            {"document_id": doc_id, "action": "create", "title": "Content", "index": 1, **email_arg},
+        )
+        tab_text = "".join(getattr(b, "text", "") for b in tab_result.content)
+        tab_id = _extract_tab_id(tab_text)
+
+        if tab_id:
+            # Step 3: populate the tab with the specialist's output
+            await session.call_tool(
+                "manage_doc_tab",
+                {
+                    "document_id": doc_id,
+                    "action": "populate_from_markdown",
+                    "tab_id": tab_id,
+                    "markdown_text": content,
+                    **email_arg,
+                },
+            )
+
+    return doc_id
 
 
 async def _call_get_doc_content(
@@ -161,20 +197,19 @@ async def _call_get_doc_content(
     grant_registry: InMemoryGrantRegistry,
     document_id: str,
 ) -> str:
-    """Check grant allowlist then call get_doc_content via the in-proc gdocs session."""
+    """Check grant allowlist then call get_doc_content via a fresh gdocs session."""
     allowed, reason = grant_registry.check_and_use(
         grant.grant_token, "get_doc_content", {"document_id": document_id}
     )
     if not allowed:
         raise PermissionError(f"get_doc_content denied by grant: {reason}")
 
-    from app.capability.gdocs_session import get_gdocs_session
-    session = get_gdocs_session()
-    if not session._started:
-        await session.start()
+    from app.capability.gdocs_session import GDocsSession
 
     gdoc_args: dict[str, Any] = {"document_id": document_id}
     if USER_GOOGLE_EMAIL:
         gdoc_args["user_google_email"] = USER_GOOGLE_EMAIL
-    result = await session.call_tool("get_doc_content", gdoc_args)
+
+    async with GDocsSession() as session:
+        result = await session.call_tool("get_doc_content", gdoc_args)
     return "".join(getattr(b, "text", "") for b in result.content)
