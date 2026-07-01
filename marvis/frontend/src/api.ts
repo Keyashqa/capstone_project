@@ -108,7 +108,7 @@ export interface JobReceipt {
   doc_id: string | null
   doc_url: string | null
   output: string
-  tools: string[]
+  tools: Array<string | { tool?: string; [k: string]: unknown }>
   verification: { advisory_score?: number; passed?: boolean; [k: string]: unknown }
   base_fee_cents: number
   completion_fee_cents: number

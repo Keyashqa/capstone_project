@@ -57,7 +57,10 @@ function JobDetail({ job }: { job: JobReceipt }) {
       {job.tools.length > 0 && (
         <div className="job-tools">
           <span className="job-section-label">Tools used</span>
-          {job.tools.map(t => <code key={t} className="job-tool-chip">{t}</code>)}
+          {job.tools.map((t, i) => {
+            const name = typeof t === 'string' ? t : (t.tool ?? JSON.stringify(t))
+            return <code key={i} className="job-tool-chip">{name}</code>
+          })}
         </div>
       )}
 
