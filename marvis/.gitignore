@@ -1,20 +1,49 @@
+# Secrets — NEVER commit
 .env
-*.db
-*.db-wal
-*.db-shm
-__pycache__/
-*.pyc
-.venv/
-dist/
-*.egg-info/
+*.env
+client_secret*.json
+*credentials*.json
+token*.json
+
+# Google OAuth token cache
+.google_workspace_mcp/
+
+# Per-user JWK key pairs (auto-generated at first login)
 app/_keys/*.json
 broker_server/_keys/*.json
 
-# Google OAuth tokens (never commit)
-mcp-test/google_workspace_mcp/.credentials/
-mcp-test/google_workspace_mcp/client_secret*.json
-google_workspace_mcp/.credentials/
+# Databases (runtime state, not source)
+*.db
+*.db-wal
+*.db-shm
 
-# Frontend
+# ADK session state
+app/.adk/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+
+# Virtual environment
+.venv/
+
+# Pytest
+.pytest_cache/
+.coverage
+
+# Frontend build artifacts
 frontend/node_modules/
 frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~

@@ -22,7 +22,7 @@ CATALOG_ID = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
 
 
 def _content(text: str) -> genai_types.Content:
-    return genai_types.Content(role="model", parts=[genai_types.Part(text=text)])
+    return genai_types.Content(role="model", parts=[genai_types.Part(text=f"<mstat>{text}</mstat>")])
 
 
 def _a2ui(messages: list[dict]) -> genai_types.Content:
@@ -31,31 +31,136 @@ def _a2ui(messages: list[dict]) -> genai_types.Content:
     return genai_types.Content(role="model", parts=[genai_types.Part(text=payload)])
 
 
-def _build_hire_summary_a2ui(agent_card: dict, base_cents: int, completion_cents: int) -> list[dict]:
+def _build_hire_summary_a2ui(agent_card: dict, skill_card: dict, task_description: str) -> list[dict]:
     sid = agent_card.get("agent_name", "agent")[:8]
     surface_id = f"hire-{sid}"
+    pricing = skill_card.get("pricing", {})
+    base_cents = pricing.get("base_fee_cents", 0)
+    completion_cents = pricing.get("completion_fee_cents", 0)
+    total_cents = base_cents + completion_cents
+
+    components = [
+        {"id": "root", "component": "Card", "child": "main-col",
+         "style": {"maxWidth": "480px"}},
+        {"id": "main-col", "component": "Column", "children": [
+            "hdr-col", "specialist-chip", "div-1",
+            "fees-col", "pin-field", "actions-row",
+        ], "spacing": 14, "align": "start"},
+
+        # Header
+        {"id": "hdr-col", "component": "Column", "children": ["title", "subtitle"],
+         "spacing": 4, "align": "start"},
+        {"id": "title",    "component": "Text", "text": "Confirm hire & escrow", "variant": "h3"},
+        {"id": "subtitle", "component": "Text", "text": {"path": "/task_description"},
+         "variant": "body", "style": {"color": "var(--text-muted)"}},
+
+        # Specialist chip
+        {"id": "specialist-chip", "component": "Row", "children": ["sp-icon", "sp-name"],
+         "align": "center", "spacing": 8,
+         "style": {"border": "1px solid var(--border)", "borderRadius": "20px",
+                   "padding": "4px 14px", "backgroundColor": "var(--surface-2)",
+                   "display": "inline-flex", "alignSelf": "flex-start"}},
+        {"id": "sp-icon", "component": "Icon", "name": "person",
+         "style": {"color": "var(--primary)"}},
+        {"id": "sp-name", "component": "Text", "text": {"path": "/specialist_name"},
+         "variant": "body", "style": {"fontWeight": "700"}},
+
+        {"id": "div-1", "component": "Divider"},
+
+        # Fees breakdown
+        {"id": "fees-col", "component": "Column",
+         "children": ["base-row", "comp-row", "div-2", "total-row"], "spacing": 10},
+
+        {"id": "base-row", "component": "Row",
+         "children": ["base-lbl", "base-amt", "base-tag"],
+         "align": "center", "justify": "spaceBetween", "spacing": 8},
+        {"id": "base-lbl", "component": "Text", "text": "Base fee",
+         "variant": "body", "weight": 0.35},
+        {"id": "base-amt", "component": "Text",
+         "text": {"call": "formatCurrency",
+                  "args": {"value": {"path": "/base_fee"}, "currency": {"path": "/currency"}},
+                  "returnType": "string"},
+         "variant": "body", "weight": 0.2, "style": {"fontWeight": "700"}},
+        {"id": "base-tag", "component": "Text", "text": "NON-REFUNDABLE",
+         "variant": "caption", "weight": 0.45,
+         "style": {"color": "var(--red)", "fontWeight": "700", "textAlign": "right"}},
+
+        {"id": "comp-row", "component": "Row",
+         "children": ["comp-lbl", "comp-amt", "comp-tag"],
+         "align": "center", "justify": "spaceBetween", "spacing": 8},
+        {"id": "comp-lbl", "component": "Text", "text": "Completion",
+         "variant": "body", "weight": 0.35},
+        {"id": "comp-amt", "component": "Text",
+         "text": {"call": "formatCurrency",
+                  "args": {"value": {"path": "/completion_fee"}, "currency": {"path": "/currency"}},
+                  "returnType": "string"},
+         "variant": "body", "weight": 0.2, "style": {"fontWeight": "700"}},
+        {"id": "comp-tag", "component": "Text", "text": "ON DELIVERY · REFUNDABLE",
+         "variant": "caption", "weight": 0.45,
+         "style": {"color": "var(--text-muted)", "fontStyle": "italic", "textAlign": "right"}},
+
+        {"id": "div-2", "component": "Divider"},
+
+        {"id": "total-row", "component": "Row",
+         "children": ["total-lbl", "total-amt"],
+         "align": "center", "justify": "spaceBetween", "spacing": 8},
+        {"id": "total-lbl", "component": "Text", "text": "Total held in escrow",
+         "variant": "h5", "weight": 0.6},
+        {"id": "total-amt", "component": "Text",
+         "text": {"call": "formatCurrency",
+                  "args": {"value": {"path": "/escrow_total"}, "currency": {"path": "/currency"}},
+                  "returnType": "string"},
+         "variant": "h4", "weight": 0.4,
+         "style": {"textAlign": "right"}},
+
+        # PIN field
+        {"id": "pin-field", "component": "TextField",
+         "label": "Enter PIN to authorize payment",
+         "value": {"path": "/pin"},
+         "variant": "password",
+         "keyboardType": "number-pad",
+         "checks": [{"condition": {"call": "regex",
+                                    "args": {"value": {"path": "/pin"},
+                                             "pattern": "^\\d{4,6}$"}},
+                     "message": "PIN must be 4–6 digits"}]},
+
+        # Action buttons
+        {"id": "actions-row", "component": "Row",
+         "children": ["reject-btn", "approve-btn"],
+         "justify": "spaceBetween", "align": "center", "spacing": 12},
+        {"id": "reject-lbl", "component": "Text", "text": "Reject"},
+        {"id": "reject-btn", "component": "Button", "child": "reject-lbl",
+         "variant": "borderless",
+         "action": {"event": {"name": "decision", "context": {"decision": "reject"}}}},
+        {"id": "approve-lbl", "component": "Text",
+         "text": {"call": "formatString",
+                  "args": {"value": "Approve & Pay {/currency}{/base_fee_display}"},
+                  "returnType": "string"}},
+        {"id": "approve-btn", "component": "Button", "child": "approve-lbl",
+         "variant": "primary",
+         "checks": [{"condition": {"call": "regex",
+                                    "args": {"value": {"path": "/pin"},
+                                             "pattern": "^\\d{4,6}$"}},
+                     "message": "Enter a valid PIN first"}],
+         "action": {"event": {"name": "decision",
+                               "context": {"decision": "approve", "pin": {"path": "/pin"}}}}},
+    ]
+
+    data = {
+        "specialist_name": agent_card.get("agent_name", "Agent"),
+        "base_fee": base_cents / 100,
+        "completion_fee": completion_cents / 100,
+        "escrow_total": total_cents / 100,
+        "currency": "$",
+        "base_fee_display": f"{base_cents / 100:.2f}",
+        "task_description": task_description,
+        "pin": "",
+    }
+
     return [
         {"version": "v0.9", "createSurface": {"surfaceId": surface_id, "catalogId": CATALOG_ID}},
-        {"version": "v0.9", "updateComponents": {"surfaceId": surface_id, "components": [
-            {"id": "root", "component": "Column",
-             "children": ["heading", "divider-0", "card", "divider-1", "hint"]},
-            {"id": "heading", "component": "Text", "text": "Hire Confirmation"},
-            {"id": "divider-0", "component": "Divider"},
-            {"id": "card", "component": "Card", "child": "card-inner"},
-            {"id": "card-inner", "component": "Column",
-             "children": ["name-row", "base-row", "completion-row", "total-row"]},
-            {"id": "name-row",       "component": "Text",
-             "text": f"Specialist:  {agent_card.get('agent_name', '?')}"},
-            {"id": "base-row",       "component": "Text",
-             "text": f"Base fee:    ${base_cents / 100:.2f} (paid now, non-refundable)"},
-            {"id": "completion-row", "component": "Text",
-             "text": f"Completion:  ${completion_cents / 100:.2f} (on delivery)"},
-            {"id": "total-row",      "component": "Text",
-             "text": f"Total held:  ${(base_cents + completion_cents) / 100:.2f} in escrow"},
-            {"id": "divider-1", "component": "Divider"},
-            {"id": "hint", "component": "Text",
-             "text": "Enter your PIN in the dialog below to authorise this hire."},
-        ]}},
+        {"version": "v0.9", "updateComponents": {"surfaceId": surface_id, "components": components},
+         "data": data},
     ]
 
 
@@ -87,7 +192,8 @@ async def authorize_base_payment(ctx: Context, node_input: dict[str, Any]):
                 )
                 return
 
-        yield Event(content=_a2ui(_build_hire_summary_a2ui(agent_card, base_cents, completion_cents)))
+        task_desc = node_input.get("goal_nl", "")[:120]
+        yield Event(content=_a2ui(_build_hire_summary_a2ui(agent_card, skill_card, task_desc)))
         yield RequestInput(interrupt_id="payment_auth", message="Enter PIN to authorise hire")
         return
 

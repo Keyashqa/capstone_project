@@ -25,7 +25,7 @@ CATALOG_ID = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
 
 
 def _content(text: str) -> genai_types.Content:
-    return genai_types.Content(role="model", parts=[genai_types.Part(text=text)])
+    return genai_types.Content(role="model", parts=[genai_types.Part(text=f"<mstat>{text}</mstat>")])
 
 
 def _a2ui(messages: list[dict]) -> genai_types.Content:
@@ -41,33 +41,116 @@ def _build_payout_a2ui(
     doc_id: str | None,
 ) -> list[dict]:
     surface_id = f"payout-{agent_name[:8]}"
-    children = ["heading", "divider-0", "card", "divider-1", "hint"]
-    card_children = ["agent-row", "score-row", "preview-row", "divider-2", "amount-row"]
+    score_stars = "★" * min(advisory_score, 10) + "☆" * max(0, 10 - advisory_score)
+    score_color = "var(--green)" if advisory_score >= 7 else "var(--gold)" if advisory_score >= 4 else "var(--red)"
+
+    doc_components: list[dict] = []
     if doc_id:
-        card_children.insert(3, "doc-row")
+        doc_components = [
+            {"id": "doc-row", "component": "Row", "children": ["doc-icon", "doc-text"],
+             "align": "center", "spacing": 6},
+            {"id": "doc-icon", "component": "Icon", "name": "doc",
+             "style": {"color": "var(--green)"}},
+            {"id": "doc-text", "component": "Text", "text": f"Google Doc: {doc_id}",
+             "variant": "caption", "style": {"color": "var(--green)", "fontWeight": "600"}},
+        ]
+
+    preview_children = ["preview-lbl", "preview-text"] + (["doc-row"] if doc_id else [])
 
     components: list[dict] = [
-        {"id": "root", "component": "Column", "children": children},
-        {"id": "heading",  "component": "Text", "text": "Work Verification"},
-        {"id": "divider-0", "component": "Divider"},
-        {"id": "card", "component": "Card", "child": "card-inner"},
-        {"id": "card-inner", "component": "Column", "children": card_children},
-        {"id": "agent-row",   "component": "Text", "text": f"Specialist:  {agent_name}"},
-        {"id": "score-row",   "component": "Text", "text": f"Advisory score:  {advisory_score}/10"},
-        {"id": "preview-row", "component": "Text", "text": f"Output preview:\n{output_preview[:200]}"},
-        {"id": "divider-2",   "component": "Divider"},
-        {"id": "amount-row",  "component": "Text",
-         "text": f"Completion fee: ${completion_cents / 100:.2f}"},
-        {"id": "divider-1", "component": "Divider"},
-        {"id": "hint",      "component": "Text",
-         "text": "Enter your PIN below to approve payout (or cancel to refund completion fee)."},
+        {"id": "root", "component": "Card", "child": "main-col",
+         "style": {"maxWidth": "480px"}},
+        {"id": "main-col", "component": "Column", "children": [
+            "hdr-col", "score-row", "div-1",
+            "preview-col", "div-2", "fee-row",
+            "pin-field", "actions-row",
+        ], "spacing": 14, "align": "start"},
+
+        # Header
+        {"id": "hdr-col", "component": "Column", "children": ["title", "agent-chip"],
+         "spacing": 8, "align": "start"},
+        {"id": "title", "component": "Text", "text": "Approve Work & Release Payment",
+         "variant": "h3"},
+        {"id": "agent-chip", "component": "Row", "children": ["sp-icon", "sp-name"],
+         "align": "center", "spacing": 8,
+         "style": {"border": "1px solid var(--border)", "borderRadius": "20px",
+                   "padding": "4px 14px", "backgroundColor": "var(--surface-2)",
+                   "display": "inline-flex", "alignSelf": "flex-start"}},
+        {"id": "sp-icon", "component": "Icon", "name": "person",
+         "style": {"color": "var(--primary)"}},
+        {"id": "sp-name", "component": "Text", "text": agent_name,
+         "variant": "body", "style": {"fontWeight": "700"}},
+
+        # Advisory score
+        {"id": "score-row", "component": "Column",
+         "children": ["score-lbl", "score-stars"],
+         "spacing": 4, "align": "start"},
+        {"id": "score-lbl", "component": "Text",
+         "text": f"Advisory score: {advisory_score}/10", "variant": "label"},
+        {"id": "score-stars", "component": "Text", "text": score_stars,
+         "variant": "body", "style": {"color": score_color, "fontSize": "1rem", "letterSpacing": "2px"}},
+
+        {"id": "div-1", "component": "Divider"},
+
+        # Output preview
+        {"id": "preview-col", "component": "Column",
+         "children": preview_children, "spacing": 6, "align": "start"},
+        {"id": "preview-lbl", "component": "Text", "text": "Output", "variant": "label"},
+        {"id": "preview-text", "component": "Text", "text": output_preview[:280],
+         "variant": "body",
+         "style": {"backgroundColor": "var(--surface)", "borderRadius": "8px",
+                   "padding": "10px 12px", "fontStyle": "italic",
+                   "border": "1px solid var(--border-light)"}},
+        *doc_components,
+
+        {"id": "div-2", "component": "Divider"},
+
+        # Completion fee
+        {"id": "fee-row", "component": "Row",
+         "children": ["fee-lbl", "fee-amt"],
+         "align": "center", "justify": "spaceBetween"},
+        {"id": "fee-lbl", "component": "Text", "text": "Completion fee to release",
+         "variant": "body", "weight": 0.6},
+        {"id": "fee-amt", "component": "Text",
+         "text": f"${completion_cents / 100:.2f}",
+         "variant": "h4", "weight": 0.4,
+         "style": {"textAlign": "right"}},
+
+        # PIN
+        {"id": "pin-field", "component": "TextField",
+         "label": "Enter PIN to approve payout",
+         "value": {"path": "/pin"},
+         "variant": "password",
+         "keyboardType": "number-pad",
+         "checks": [{"condition": {"call": "regex",
+                                    "args": {"value": {"path": "/pin"},
+                                             "pattern": "^\\d{4,6}$"}},
+                     "message": "PIN must be 4–6 digits"}]},
+
+        # Buttons
+        {"id": "actions-row", "component": "Row",
+         "children": ["reject-btn", "approve-btn"],
+         "justify": "spaceBetween", "align": "center", "spacing": 12},
+        {"id": "reject-lbl", "component": "Text", "text": "Reject & Refund"},
+        {"id": "reject-btn", "component": "Button", "child": "reject-lbl",
+         "variant": "borderless",
+         "action": {"event": {"name": "decision", "context": {"decision": "reject"}}}},
+        {"id": "approve-lbl", "component": "Text",
+         "text": f"Approve & Release ${completion_cents / 100:.2f}"},
+        {"id": "approve-btn", "component": "Button", "child": "approve-lbl",
+         "variant": "primary",
+         "checks": [{"condition": {"call": "regex",
+                                    "args": {"value": {"path": "/pin"},
+                                             "pattern": "^\\d{4,6}$"}},
+                     "message": "Enter a valid PIN first"}],
+         "action": {"event": {"name": "decision",
+                               "context": {"decision": "approve", "pin": {"path": "/pin"}}}}},
     ]
-    if doc_id:
-        components.append({"id": "doc-row", "component": "Text", "text": f"Doc saved: {doc_id}"})
 
     return [
         {"version": "v0.9", "createSurface": {"surfaceId": surface_id, "catalogId": CATALOG_ID}},
-        {"version": "v0.9", "updateComponents": {"surfaceId": surface_id, "components": components}},
+        {"version": "v0.9", "updateComponents": {"surfaceId": surface_id, "components": components},
+         "data": {"pin": ""}},
     ]
 
 

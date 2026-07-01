@@ -154,5 +154,32 @@ def init_db() -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_grants_token ON capability_grants(grant_token)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_grants_task ON capability_grants(task_id)")
 
+    # ── Job receipts (what was actually delivered for a given payment) ─────────
+    # Linked to a wallet ledger row via task_id (== ledger.reference_id for the
+    # escrow hold / refund). Powers the "what did I pay for" view in MPay.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS job_receipts (
+            task_id              TEXT PRIMARY KEY,
+            user_id              TEXT NOT NULL,
+            goal_nl              TEXT,
+            agent_name           TEXT,
+            skill_id             TEXT,
+            booking_id           TEXT,
+            txn_id               TEXT,
+            grant_id             TEXT,
+            doc_id               TEXT,
+            output               TEXT,
+            tools_json           TEXT NOT NULL DEFAULT '[]',
+            verification_json    TEXT NOT NULL DEFAULT '{}',
+            base_fee_cents       INTEGER NOT NULL DEFAULT 0,
+            completion_fee_cents INTEGER NOT NULL DEFAULT 0,
+            total_cents          INTEGER NOT NULL DEFAULT 0,
+            status               TEXT NOT NULL DEFAULT 'completed',
+            created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at           TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_receipts_user ON job_receipts(user_id)")
+
     conn.commit()
     conn.close()

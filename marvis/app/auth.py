@@ -227,9 +227,20 @@ async def create_adk_session(req: CreateAdkSessionRequest) -> dict:
 
 @router.get("/wallet/balance")
 async def get_wallet_balance(token: str) -> dict:
+    from app.receipts import get_job_receipts_by_task
+
     user = _get_user_from_token(token)
     balance = await wallet_ops.get_balance(user["id"])
     transactions = wallet_ops.get_transactions(user["id"])
+
+    # Attach the job receipt (what was delivered) to each transaction, linked by
+    # ledger.reference_id == task_id.
+    receipts = get_job_receipts_by_task(user["id"])
+    for t in transactions:
+        ref = t.get("reference_id")
+        if ref and ref in receipts:
+            t["job"] = receipts[ref]
+
     return {"balance_cents": balance, "transactions": transactions}
 
 

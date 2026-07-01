@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { apiLogin, apiRegister, type AuthState } from '../api'
+import { BrandMark } from '../components/Sidebar'
 
 interface Props {
   onAuth: (state: AuthState) => void
+  onBack?: () => void
+  initialMode?: 'login' | 'register'
 }
 
-export default function Auth({ onAuth }: Props) {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+export default function Auth({ onAuth, onBack, initialMode = 'login' }: Props) {
+  const [mode, setMode] = useState<'login' | 'register'>(initialMode)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [pin, setPin] = useState('')
@@ -32,7 +35,16 @@ export default function Auth({ onAuth }: Props) {
   return (
     <div className="page">
       <div className="auth-card">
-        <h1>{mode === 'login' ? '🤖 Sign In to Marvis' : '🤖 Create Marvis Account'}</h1>
+        <div className="auth-brand">
+          <BrandMark size={44} />
+          <span className="auth-wordmark">Marvis</span>
+        </div>
+        <h1>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
+        <p className="auth-subtitle">
+          {mode === 'login'
+            ? 'Sign in to your AI orchestrator.'
+            : 'Your personal AI orchestrator that hires and pays agents to get work done.'}
+        </p>
         <form onSubmit={submit}>
           <div className="form-group">
             <label>Email</label>
@@ -63,6 +75,9 @@ export default function Auth({ onAuth }: Props) {
         >
           {mode === 'login' ? "Don't have an account? Register" : 'Already registered? Sign In'}
         </button>
+        {onBack && (
+          <button className="auth-back" onClick={onBack}>← Back to home</button>
+        )}
       </div>
     </div>
   )

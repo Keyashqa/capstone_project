@@ -50,7 +50,7 @@ _REQUIRED_KEYS = {"type", "inputs", "acceptance_criteria"}
 
 
 def _content(text: str) -> genai_types.Content:
-    return genai_types.Content(role="model", parts=[genai_types.Part(text=text)])
+    return genai_types.Content(role="model", parts=[genai_types.Part(text=f"<mstat>{text}</mstat>")])
 
 
 async def _parse_with_ollama(goal_nl: str) -> dict:

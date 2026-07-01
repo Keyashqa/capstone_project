@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# uv
+.uv/
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Secrets and credentials — NEVER commit these
+.env
+*.env
+client_secret*.json
+*credentials*.json
+service_account*.json
+token*.json
+token*.pickle
+
+# Google OAuth token cache
+.google_workspace_mcp/
+**/credentials/*.json
+
+# Per-user JWK key pairs (generated at runtime)
+app/_keys/*.json
+broker_server/_keys/*.json
+
+# Databases (runtime state)
+*.db
+*.db-wal
+*.db-shm
+
+# ADK session state
+**/.adk/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+.npm/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~

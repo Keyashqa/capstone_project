@@ -17,7 +17,7 @@ from app.config import GRANT_TTL_SECONDS
 
 
 def _content(text: str) -> genai_types.Content:
-    return genai_types.Content(role="model", parts=[genai_types.Part(text=text)])
+    return genai_types.Content(role="model", parts=[genai_types.Part(text=f"<mstat>{text}</mstat>")])
 
 
 async def grant_capability(node_input: dict[str, Any]) -> Any:

@@ -24,7 +24,7 @@ from app.config import OLLAMA_MODEL
 
 
 def _content(text: str) -> genai_types.Content:
-    return genai_types.Content(role="model", parts=[genai_types.Part(text=text)])
+    return genai_types.Content(role="model", parts=[genai_types.Part(text=f"<mstat>{text}</mstat>")])
 
 
 def _deterministic_checks(

@@ -18,7 +18,7 @@ from app.marketplace.skill_registry import get_registry
 
 
 def _content(text: str) -> genai_types.Content:
-    return genai_types.Content(role="model", parts=[genai_types.Part(text=text)])
+    return genai_types.Content(role="model", parts=[genai_types.Part(text=f"<mstat>{text}</mstat>")])
 
 
 async def discover_specialists(node_input: dict[str, Any]) -> Any:

@@ -58,6 +58,38 @@ def health() -> dict:
     return {"status": "ok", "service": "marvis", "model": MODEL_NAME}
 
 
+@app.get("/marketplace/agents")
+def marketplace_agents() -> dict:
+    """Public catalog of hireable specialist agents (SkillCards)."""
+    from app.marketplace.seed import seed_catalog
+    from app.marketplace.skill_registry import get_registry
+
+    seed_catalog()  # idempotent — ensures catalog is populated
+    cards = get_registry().list_cards()
+
+    agents = [
+        {
+            "skill_id": c.skill_id,
+            "agent_name": c.agent_name,
+            "display_name": c.display_name,
+            "version": c.version,
+            "description": c.description,
+            "specialties": c.specialties,
+            "model": c.model,
+            "currency": c.pricing.currency,
+            "base_fee_cents": c.pricing.base_fee_cents,
+            "completion_fee_cents": c.pricing.completion_fee_cents,
+            "capabilities": [
+                {"mcp_server": cap.mcp_server, "tool_name": cap.tool_name, "why": cap.why}
+                for cap in c.required_capabilities
+            ],
+            "reputation": c.reputation,
+        }
+        for c in cards
+    ]
+    return {"agents": agents, "count": len(agents)}
+
+
 # Serve React UI build if it exists
 _DIST = Path(__file__).parent.parent / "frontend" / "dist"
 if _DIST.exists():

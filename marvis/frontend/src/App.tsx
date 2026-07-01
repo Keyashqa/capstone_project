@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
+import Landing from './pages/Landing'
 import Auth from './pages/Auth'
 import Wallet from './pages/Wallet'
 import Chat from './pages/Chat'
+import Marketplace from './pages/Marketplace'
 import type { AuthState } from './api'
 import './App.css'
 
-type Page = 'auth' | 'wallet' | 'chat'
+type Page = 'landing' | 'auth' | 'wallet' | 'chat' | 'marketplace'
 
 const STORAGE_KEY = 'marvis_auth'
 
@@ -26,11 +28,12 @@ function clearAuth() {
 
 export default function App() {
   const [auth, setAuth] = useState<AuthState | null>(loadAuth)
-  const [page, setPage] = useState<Page>(auth ? 'wallet' : 'auth')
+  const [page, setPage] = useState<Page>(auth ? 'wallet' : 'landing')
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
 
   useEffect(() => {
-    if (!auth) setPage('auth')
-  }, [auth])
+    if (!auth && page !== 'auth' && page !== 'landing') setPage('landing')
+  }, [auth, page])
 
   const handleAuth = (state: AuthState) => {
     saveAuth(state)
@@ -41,7 +44,7 @@ export default function App() {
   const handleLogout = () => {
     clearAuth()
     setAuth(null)
-    setPage('auth')
+    setPage('landing')
   }
 
   const handleBalanceChange = (cents: number) => {
@@ -52,15 +55,39 @@ export default function App() {
     }
   }
 
-  if (!auth || page === 'auth') {
-    return <Auth onAuth={handleAuth} />
+  const goToAuth = (mode: 'login' | 'register') => {
+    setAuthMode(mode)
+    setPage('auth')
   }
 
-  if (page === 'wallet') {
+  if (!auth) {
+    if (page === 'auth') {
+      return <Auth initialMode={authMode} onAuth={handleAuth} onBack={() => setPage('landing')} />
+    }
     return (
-      <Wallet
-        token={auth.token}
+      <Landing
+        onGetStarted={() => goToAuth('register')}
+        onSignIn={() => goToAuth('login')}
+      />
+    )
+  }
+
+  if (page === 'chat') {
+    return (
+      <Chat
+        auth={auth}
+        onNavigate={setPage}
+        onLogout={handleLogout}
+        onBalanceChange={handleBalanceChange}
+      />
+    )
+  }
+
+  if (page === 'marketplace') {
+    return (
+      <Marketplace
         email={auth.email}
+        balanceCents={auth.balanceCents}
         onNavigate={setPage}
         onLogout={handleLogout}
       />
@@ -68,11 +95,11 @@ export default function App() {
   }
 
   return (
-    <Chat
-      auth={auth}
+    <Wallet
+      token={auth.token}
+      email={auth.email}
       onNavigate={setPage}
       onLogout={handleLogout}
-      onBalanceChange={handleBalanceChange}
     />
   )
 }

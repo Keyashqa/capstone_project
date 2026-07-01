@@ -4,4 +4,5 @@ body {
   color: var(--text);
   font-family: var(--font);
   margin: 0;
+  -webkit-font-smoothing: antialiased;
 }

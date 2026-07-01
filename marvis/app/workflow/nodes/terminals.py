@@ -16,13 +16,15 @@ from typing import Any
 from google.adk.events.event import Event
 from google.genai import types as genai_types
 
+from app.receipts import save_job_receipt
+
 CATALOG_ID = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
 
 _SEP = "=" * 56
 
 
 def _content(text: str) -> genai_types.Content:
-    return genai_types.Content(role="model", parts=[genai_types.Part(text=text)])
+    return genai_types.Content(role="model", parts=[genai_types.Part(text=f"<mstat>{text}</mstat>")])
 
 
 def _a2ui(messages: list[dict]) -> genai_types.Content:
@@ -39,37 +41,103 @@ def _build_receipt_a2ui(
     task_id: str,
 ) -> list[dict]:
     surface_id = f"receipt-{task_id[:8]}"
-    card_children = [
-        "agent-row", "taskid-row", "booking-row", "divider-2", "amount-row"
-    ]
+    doc_components: list[dict] = []
     if doc_id:
-        card_children.append("doc-row")
+        doc_components = [
+            {"id": "doc-div", "component": "Divider"},
+            {"id": "doc-row", "component": "Row", "children": ["doc-icon", "doc-col"],
+             "align": "center", "spacing": 10},
+            {"id": "doc-icon", "component": "Icon", "name": "doc",
+             "style": {"color": "var(--green)", "fontSize": "1.3rem"}},
+            {"id": "doc-col", "component": "Column",
+             "children": ["doc-lbl", "doc-id"], "spacing": 2},
+            {"id": "doc-lbl", "component": "Text", "text": "Google Doc created",
+             "variant": "label"},
+            {"id": "doc-id",  "component": "Text",
+             "text": "Open it from MPay → this payment",
+             "variant": "caption", "style": {"color": "var(--green)"}},
+        ]
+
+    meta_rows = [
+        {"id": "booking-row", "component": "Row",
+         "children": ["bkg-lbl", "bkg-val"],
+         "align": "center", "justify": "spaceBetween"},
+        {"id": "bkg-lbl", "component": "Text", "text": "Booking ID", "variant": "label", "weight": 0.4},
+        {"id": "bkg-val", "component": "Text", "text": booking_id,
+         "variant": "caption", "weight": 0.6, "style": {"textAlign": "right", "fontFamily": "monospace"}},
+        {"id": "agent-row", "component": "Row",
+         "children": ["agt-lbl", "agt-val"],
+         "align": "center", "justify": "spaceBetween"},
+        {"id": "agt-lbl", "component": "Text", "text": "Specialist", "variant": "label", "weight": 0.4},
+        {"id": "agt-val", "component": "Text", "text": agent_name,
+         "variant": "body", "weight": 0.6,
+         "style": {"textAlign": "right", "fontWeight": "700"}},
+        {"id": "paid-row", "component": "Row",
+         "children": ["paid-lbl", "paid-val"],
+         "align": "center", "justify": "spaceBetween"},
+        {"id": "paid-lbl", "component": "Text", "text": "Total paid", "variant": "label", "weight": 0.5},
+        {"id": "paid-val", "component": "Text", "text": f"${total_cents / 100:.2f} USD",
+         "variant": "h4", "weight": 0.5, "style": {"textAlign": "right"}},
+    ]
+
+    content_section = [
+        {"id": "content-div", "component": "Divider"},
+        {"id": "output-lbl", "component": "Text", "text": "Delivered output", "variant": "label"},
+        {"id": "output-preview", "component": "Text", "text": output_preview[:300],
+         "variant": "body",
+         "style": {"backgroundColor": "var(--surface)", "borderRadius": "8px",
+                   "padding": "10px 12px", "fontStyle": "italic",
+                   "border": "1px solid var(--border-light)", "marginTop": "4px"}},
+    ]
+
+    col_children = (
+        ["title", "status-row", "div-1"]
+        + [c["id"] for c in meta_rows]
+        + [c["id"] for c in doc_components]
+        + [c["id"] for c in content_section]
+    )
 
     components: list[dict] = [
-        {"id": "root", "component": "Column",
-         "children": ["heading", "divider-0", "card", "divider-1", "preview"]},
-        {"id": "heading",   "component": "Text", "text": "Task Complete!"},
-        {"id": "divider-0", "component": "Divider"},
-        {"id": "card",      "component": "Card", "child": "card-inner"},
-        {"id": "card-inner","component": "Column", "children": card_children},
-        {"id": "agent-row",   "component": "Text", "text": f"Specialist:   {agent_name}"},
-        {"id": "taskid-row",  "component": "Text", "text": f"Task ID:      {task_id}"},
-        {"id": "booking-row", "component": "Text", "text": f"Booking ID:   {booking_id}"},
-        {"id": "divider-2",   "component": "Divider"},
-        {"id": "amount-row",  "component": "Text",
-         "text": f"Total paid:   ${total_cents / 100:.2f} USD"},
-        {"id": "divider-1",   "component": "Divider"},
-        {"id": "preview",     "component": "Text",
-         "text": f"Output:\n{output_preview[:300]}"},
+        {"id": "root", "component": "Card", "child": "main-col",
+         "style": {"maxWidth": "480px", "borderColor": "var(--green)"}},
+        {"id": "main-col", "component": "Column",
+         "children": col_children, "spacing": 10, "align": "start"},
+        {"id": "title", "component": "Text", "text": "Task Complete", "variant": "h3",
+         "style": {"color": "var(--green)"}},
+        {"id": "status-row", "component": "Row", "children": ["check-icon", "status-txt"],
+         "align": "center", "spacing": 6},
+        {"id": "check-icon", "component": "Icon", "name": "check",
+         "style": {"color": "var(--green)"}},
+        {"id": "status-txt", "component": "Text",
+         "text": "Specialist delivered — payment settled",
+         "variant": "body", "style": {"color": "var(--text-muted)"}},
+        {"id": "div-1", "component": "Divider"},
+        *meta_rows,
+        *doc_components,
+        *content_section,
     ]
-    if doc_id:
-        components.append(
-            {"id": "doc-row", "component": "Text", "text": f"Google Doc:   {doc_id}"}
-        )
 
     return [
         {"version": "v0.9", "createSurface": {"surfaceId": surface_id, "catalogId": CATALOG_ID}},
         {"version": "v0.9", "updateComponents": {"surfaceId": surface_id, "components": components}},
+    ]
+
+
+def _build_status_a2ui(surface_id: str, title: str, body: str,
+                        color: str = "var(--text-muted)") -> list[dict]:
+    """Generic status card for terminals that don't need rich layout."""
+    return [
+        {"version": "v0.9", "createSurface": {"surfaceId": surface_id, "catalogId": CATALOG_ID}},
+        {"version": "v0.9", "updateComponents": {"surfaceId": surface_id, "components": [
+            {"id": "root", "component": "Card", "child": "col",
+             "style": {"maxWidth": "480px", "borderColor": color}},
+            {"id": "col", "component": "Column",
+             "children": ["title", "body"], "spacing": 8, "align": "start"},
+            {"id": "title", "component": "Text", "text": title, "variant": "h3",
+             "style": {"color": color}},
+            {"id": "body",  "component": "Text", "text": body,  "variant": "body",
+             "style": {"color": "var(--text-muted)"}},
+        ]}},
     ]
 
 
@@ -87,6 +155,8 @@ async def receipt_terminal(node_input: dict[str, Any]) -> Any:
     agent_name: str = result.get("agent_name", skill_card.get("agent_name", "Agent"))
     output: str = result.get("output", "")
     doc_id: str | None = result.get("doc_id")
+
+    save_job_receipt(node_input, "completed")
 
     return Event(
         output={
@@ -115,11 +185,12 @@ def no_specialist_terminal(node_input: dict[str, Any]) -> Any:
     spec = node_input.get("spec", {})
     return Event(
         output={"status": "no_specialist"},
-        content=_content(
-            f"\n{_SEP}\n  NO SPECIALIST AVAILABLE\n{_SEP}\n"
-            f"  No skill found for task type '{spec.get('type', '?')}'.\n"
-            f"  Try rephrasing your request.\n{_SEP}\n"
-        ),
+        content=_a2ui(_build_status_a2ui(
+            "no-specialist", "No Specialist Available",
+            f"No skill found for task type '{spec.get('type', '?')}'. "
+            f"Try rephrasing your request.",
+            color="var(--gold)",
+        )),
     )
 
 
@@ -128,10 +199,11 @@ def no_specialist_terminal(node_input: dict[str, Any]) -> Any:
 def cancelled_terminal(node_input: dict[str, Any]) -> Any:
     return Event(
         output={"status": "cancelled"},
-        content=_content(
-            f"\n{_SEP}\n  HIRE CANCELLED\n{_SEP}\n"
-            f"  No payment was made. Start a new chat to try again.\n{_SEP}\n"
-        ),
+        content=_a2ui(_build_status_a2ui(
+            "cancelled", "Hire Cancelled",
+            "No payment was made. Start a new chat to try again.",
+            color="var(--text-muted)",
+        )),
     )
 
 
@@ -140,10 +212,11 @@ def cancelled_terminal(node_input: dict[str, Any]) -> Any:
 def hire_invalid_terminal(node_input: dict[str, Any]) -> Any:
     return Event(
         output={"status": "hire_invalid"},
-        content=_content(
-            f"\n{_SEP}\n  HIRE FAILED — Invalid CartMandate\n{_SEP}\n"
-            f"  The broker's CartMandate failed validation. Please try again.\n{_SEP}\n"
-        ),
+        content=_a2ui(_build_status_a2ui(
+            "hire-invalid", "Hire Failed",
+            "The broker's CartMandate failed validation. Please try again.",
+            color="var(--red)",
+        )),
     )
 
 
@@ -172,21 +245,19 @@ async def verify_failed(node_input: dict[str, Any]) -> Any:
         except Exception as exc:
             issues.append(f"refund failed: {exc}")
 
-    issue_lines = "\n".join(f"  • {i}" for i in issues) if issues else "  (no details)"
+    issue_text = "\n".join(f"• {i}" for i in issues) if issues else "No details available."
+    refund_note = (
+        f"\n\nCompletion fee ${completion_cents/100:.2f} has been refunded to your wallet."
+        if refund_journal else ""
+    )
 
     return Event(
-        output={
-            **node_input,
-            "status": "verify_failed",
-            "refund_journal": refund_journal,
-        },
-        content=_content(
-            f"\n{_SEP}\n  VERIFICATION FAILED\n{_SEP}\n"
-            f"{issue_lines}\n"
-            f"{_SEP}\n"
-            + (f"  Completion fee ${completion_cents/100:.2f} refunded.\n" if refund_journal else "")
-            + f"{_SEP}\n"
-        ),
+        output={**node_input, "status": "verify_failed", "refund_journal": refund_journal},
+        content=_a2ui(_build_status_a2ui(
+            f"verify-failed-{task_id[:6]}", "Verification Failed",
+            issue_text + refund_note,
+            color="var(--red)",
+        )),
     )
 
 
@@ -196,12 +267,14 @@ def refunded_terminal(node_input: dict[str, Any]) -> Any:
     base_cents: int = pricing.get("base_fee_cents", 0)
     completion_cents: int = pricing.get("completion_fee_cents", 0)
 
+    save_job_receipt(node_input, "refunded")
+
     return Event(
         output={"status": "refunded"},
-        content=_content(
-            f"\n{_SEP}\n  TASK ENDED — PARTIAL REFUND\n{_SEP}\n"
-            f"  Base fee (${base_cents/100:.2f}) kept by specialist.\n"
-            f"  Completion fee (${completion_cents/100:.2f}) refunded to your wallet.\n"
-            f"{_SEP}\n"
-        ),
+        content=_a2ui(_build_status_a2ui(
+            "refunded", "Task Ended — Partial Refund",
+            f"Base fee (${base_cents/100:.2f}) kept by specialist.\n"
+            f"Completion fee (${completion_cents/100:.2f}) refunded to your wallet.",
+            color="var(--gold)",
+        )),
     )

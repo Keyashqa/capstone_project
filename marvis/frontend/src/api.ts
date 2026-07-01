@@ -69,12 +69,61 @@ export async function apiTopup(token: string, amountCents: number): Promise<numb
   return d.balance_cents
 }
 
+export interface AgentCapability {
+  mcp_server: string
+  tool_name: string
+  why: string
+}
+
+export interface MarketAgent {
+  skill_id: string
+  agent_name: string
+  display_name: string
+  version: string
+  description: string
+  specialties: string[]
+  model: string
+  currency: string
+  base_fee_cents: number
+  completion_fee_cents: number
+  capabilities: AgentCapability[]
+  reputation: number | null
+}
+
+export async function apiGetAgents(): Promise<MarketAgent[]> {
+  const r = await fetch(`${AGENT}/marketplace/agents`)
+  if (!r.ok) throw new Error('Failed to load marketplace')
+  const d = await r.json()
+  return d.agents as MarketAgent[]
+}
+
+export interface JobReceipt {
+  task_id: string
+  goal: string
+  agent_name: string
+  skill_id: string
+  booking_id: string | null
+  txn_id: string | null
+  grant_id: string | null
+  doc_id: string | null
+  doc_url: string | null
+  output: string
+  tools: string[]
+  verification: { advisory_score?: number; passed?: boolean; [k: string]: unknown }
+  base_fee_cents: number
+  completion_fee_cents: number
+  total_cents: number
+  status: string
+  created_at: string
+}
+
 export interface Transaction {
   id: string
   delta_cents: number
   reason: string
   reference_id: string | null
   created_at: string
+  job?: JobReceipt
 }
 
 export interface HitlRequest {
@@ -82,19 +131,41 @@ export interface HitlRequest {
   question: string
 }
 
+export type A2uiTextValue =
+  | string
+  | { path: string }
+  | { call: string; args: Record<string, any>; returnType?: string }
+
 export interface A2uiComponent {
   id: string
-  component: 'Column' | 'Row' | 'Card' | 'Text' | 'Divider' | 'Button'
+  component: 'Column' | 'Row' | 'Card' | 'Text' | 'Divider' | 'Button' | 'TextField' | 'Icon'
+  // layout
   children?: string[]
   child?: string
-  text?: string
-  action?: { event: { name: string } }
+  align?: string
+  justify?: string
+  spacing?: number
+  weight?: number
+  style?: Record<string, string>
+  // Text
+  text?: A2uiTextValue
+  variant?: string
+  // TextField
+  label?: string
+  value?: { path: string }
+  keyboardType?: string
+  checks?: Array<{ condition: any; message: string }>
+  // Icon
+  name?: string
+  // Button
+  action?: { event: { name: string; context?: Record<string, any> } }
 }
 
 export interface A2uiSurface {
   version: string
   createSurface?: { surfaceId: string; catalogId: string }
   updateComponents?: { surfaceId: string; components: A2uiComponent[] }
+  data?: Record<string, any>
 }
 
 export interface Message {
@@ -102,13 +173,14 @@ export interface Message {
   role: 'user' | 'agent' | 'system'
   text: string
   a2ui?: A2uiSurface[]
+  statuses?: string[]
 }
 
 export async function* streamAdkRun(
   userId: string,
   sessionId: string,
   parts: object[],
-): AsyncGenerator<{ text?: string; hitl?: HitlRequest; a2ui?: A2uiSurface[]; done?: boolean }> {
+): AsyncGenerator<{ text?: string; status?: string; hitl?: HitlRequest; a2ui?: A2uiSurface[]; done?: boolean }> {
   const body = JSON.stringify({
     app_name: 'app',
     user_id: userId,
@@ -146,11 +218,19 @@ export async function* streamAdkRun(
         const evParts = ev?.content?.parts ?? []
         for (const p of evParts) {
           if (p.text) {
-            const m = (p.text as string).match(/<a2ui-json>([\s\S]*?)<\/a2ui-json>/)
+            const raw = p.text as string
+            const m = raw.match(/<a2ui-json>([\s\S]*?)<\/a2ui-json>/)
             if (m) {
               try { yield { a2ui: JSON.parse(m[1]) as A2uiSurface[] } } catch { /* ignore */ }
+            } else if (raw.includes('<mstat>')) {
+              const re = /<mstat>([\s\S]*?)<\/mstat>/g
+              let mm: RegExpExecArray | null
+              while ((mm = re.exec(raw)) !== null) {
+                const inner = mm[1].trim()
+                if (inner) yield { status: inner }
+              }
             } else {
-              yield { text: p.text }
+              yield { text: raw }
             }
           }
           if (p.functionCall?.name === 'adk_request_input') {
