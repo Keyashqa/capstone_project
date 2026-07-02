@@ -21,6 +21,24 @@ def _content(text: str) -> genai_types.Content:
     return genai_types.Content(role="model", parts=[genai_types.Part(text=f"<mstat>{text}</mstat>")])
 
 
+def _channel_key(raw: str) -> str:
+    """Normalise a free-form channel value to a canonical platform key."""
+    r = raw.lower()
+    if "insta" in r:
+        return "instagram"
+    if "linkedin" in r or "linked-in" in r:
+        return "linkedin"
+    if "twitter" in r or "tweet" in r or r.strip() == "x":
+        return "twitter"
+    return ""
+
+
+def _is_review(task_type: str, goal_nl: str) -> bool:
+    """Heuristic: does this task want an existing post reviewed rather than written?"""
+    t = f"{task_type} {goal_nl}".lower()
+    return any(w in t for w in ("review", "reading", "reader", "critique", "feedback", "evaluate"))
+
+
 async def discover_specialists(node_input: dict[str, Any]) -> Any:
     """Query the in-process SkillRegistry for skills matching this task."""
     spec: dict = node_input.get("spec", {})
@@ -54,21 +72,22 @@ async def select_specialist(node_input: dict[str, Any]) -> Any:
 
     registry = get_registry()
 
-    # Prefer the most specific match; for Phase 1 this is straightforward:
-    # doc_writing → skill-doc-writer, doc_reading → skill-doc-reader
-    chosen: SkillCard | None = None
-    for skill_id in candidate_ids:
-        card = registry.get(skill_id)
-        if task_type in ("doc_writing", "content_writing") and "write" in skill_id:
-            chosen = card
-            break
-        if task_type in ("doc_reading", "research") and "read" in skill_id:
-            chosen = card
-            break
+    # Route by platform (channel) + role (write vs review). Each candidate skill_id
+    # encodes both, e.g. "skill-twitter-writer" / "skill-linkedin-reviewer".
+    channel_key = _channel_key(str(spec.get("inputs", {}).get("channel", "")))
+    review = _is_review(task_type, node_input.get("goal_nl", ""))
 
-    # Fallback: pick first candidate
-    if chosen is None and candidate_ids:
-        chosen = registry.get(candidate_ids[0])
+    def _score(card: SkillCard) -> int:
+        sid = card.skill_id
+        score = 0
+        if channel_key and channel_key in sid:
+            score += 2                       # right platform matters most
+        if sid.endswith("reviewer" if review else "writer"):
+            score += 1                       # right role
+        return score
+
+    candidates = [registry.get(cid) for cid in candidate_ids]
+    chosen: SkillCard | None = max(candidates, key=_score) if candidates else None
 
     if chosen is None:
         return Event(

@@ -27,6 +27,20 @@ def _content(text: str) -> genai_types.Content:
     return genai_types.Content(role="model", parts=[genai_types.Part(text=f"<mstat>{text}</mstat>")])
 
 
+# Per-platform character limits enforced on written posts.
+_CHANNEL_LIMITS = {"twitter": 280, "instagram": 2200, "linkedin": 3000}
+
+
+def _channel_limit(channel: str) -> tuple[str, int]:
+    """Resolve a free-form channel to (platform_name, char_limit). Defaults to twitter."""
+    c = channel.lower()
+    if "insta" in c:
+        return "instagram", _CHANNEL_LIMITS["instagram"]
+    if "linkedin" in c or "linked-in" in c:
+        return "linkedin", _CHANNEL_LIMITS["linkedin"]
+    return "twitter", _CHANNEL_LIMITS["twitter"]
+
+
 def _deterministic_checks(
     spec: dict,
     result: dict,
@@ -40,15 +54,20 @@ def _deterministic_checks(
 
     issues: list[str] = []
 
-    # For doc_writing tasks: check tweet length
+    # For post-writing tasks: enforce the platform's character limit.
     if task_type in ("doc_writing", "content_writing"):
-        tweet_text = output.strip()
-        # If the output is longer than a tweet, check first paragraph
-        lines = [l.strip() for l in tweet_text.splitlines() if l.strip()]
-        tweet_candidate = lines[0] if lines else tweet_text
-        if len(tweet_candidate) > 280:
+        platform, limit = _channel_limit(str(spec.get("inputs", {}).get("channel", "")))
+        text = output.strip()
+        if platform == "twitter":
+            # Short-form: the post is one line — ignore any trailing model chatter.
+            lines = [l.strip() for l in text.splitlines() if l.strip()]
+            candidate = lines[0] if lines else text
+        else:
+            # Long-form captions/posts: check the whole body.
+            candidate = text
+        if len(candidate) > limit:
             issues.append(
-                f"tweet body is {len(tweet_candidate)} chars (max 280)"
+                f"{platform} post is {len(candidate)} chars (max {limit})"
             )
 
     # create_doc must have been called

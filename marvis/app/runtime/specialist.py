@@ -75,7 +75,7 @@ async def run_specialist(
         doc_id = await _call_create_doc(
             grant=grant,
             grant_registry=grant_registry,
-            title=inputs.get("doc_title", "Twitter Scripts — Marvis launch"),
+            title=inputs.get("doc_title", "Marvis social post"),
             content=text_output,
         )
         result.doc_id = doc_id
@@ -123,7 +123,13 @@ async def _call_create_doc(
     title: str,
     content: str,
 ) -> str | None:
-    """Check grant, create doc, then populate a content tab — mirrors create_doc.py exactly."""
+    """Check the grant, then create the doc with its content in a single call.
+
+    Passing content up-front (create_doc's optional `content` arg) inserts it once
+    at the document start. This avoids the Google Docs API error
+    "insertion index cannot be within a grapheme cluster" that
+    manage_doc_tab/populate_from_markdown raises on emoji-rich posts.
+    """
     allowed, reason = grant_registry.check_and_use(
         grant.grant_token, "create_doc", {"title": title, "content": content}
     )
@@ -144,52 +150,16 @@ async def _call_create_doc(
                 return m.group(1)
         return None
 
-    def _extract_tab_id(text: str) -> str | None:
-        for pat in [
-            r'["\']tab_id["\']\s*:\s*["\']([a-zA-Z0-9_.\-]+)["\']',
-            r'Tab ID:\s*([a-zA-Z0-9_.\-]+)',
-        ]:
-            m = re.search(pat, text)
-            if m:
-                return m.group(1).rstrip(".")
-        return None
-
     email_arg = {"user_google_email": USER_GOOGLE_EMAIL} if USER_GOOGLE_EMAIL else {}
+    create_args = {"title": title, **email_arg}
+    if content:
+        create_args["content"] = content
 
     async with GDocsSession() as session:
-        # Step 1: create the empty doc
-        create_result = await session.call_tool("create_doc", {"title": title, **email_arg})
+        create_result = await session.call_tool("create_doc", create_args)
         create_text = "".join(getattr(b, "text", "") for b in create_result.content)
-        doc_id = _extract_doc_id(create_text)
 
-        if not doc_id:
-            return "created"
-
-        if not content:
-            return doc_id
-
-        # Step 2: create a "Content" tab
-        tab_result = await session.call_tool(
-            "manage_doc_tab",
-            {"document_id": doc_id, "action": "create", "title": "Content", "index": 1, **email_arg},
-        )
-        tab_text = "".join(getattr(b, "text", "") for b in tab_result.content)
-        tab_id = _extract_tab_id(tab_text)
-
-        if tab_id:
-            # Step 3: populate the tab with the specialist's output
-            await session.call_tool(
-                "manage_doc_tab",
-                {
-                    "document_id": doc_id,
-                    "action": "populate_from_markdown",
-                    "tab_id": tab_id,
-                    "markdown_text": content,
-                    **email_arg,
-                },
-            )
-
-    return doc_id
+    return _extract_doc_id(create_text) or "created"
 
 
 async def _call_get_doc_content(

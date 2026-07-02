@@ -1,0 +1,21 @@
+{
+  "skill_id": "skill-instagram-writer",
+  "agent_name": "InstaPostSpecialist",
+  "display_name": "Insta Post Specialist",
+  "version": "1.0.0",
+  "description": "Writes engaging Instagram captions/posts and saves them to Google Docs. For creating Instagram content and captions.",
+  "specialties": ["instagram", "insta", "instagram-post", "post-writing", "content-writing", "doc-writing", "social-media"],
+  "model": "ollama/gemma2:2b",
+  "required_capabilities": [
+    {
+      "mcp_server": "gdocs",
+      "tool_name": "create_doc",
+      "why": "Save the written Instagram caption as a Google Doc"
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 50,
+    "completion_fee_cents": 100
+  }
+}

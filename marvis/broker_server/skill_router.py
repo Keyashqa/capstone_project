@@ -5,13 +5,20 @@ GET /.well-known/agent-card  → broker's identity (M0 health check: :8002/.well
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from fastapi import APIRouter
 
 from broker_server.keys import broker_public_key_dict
 
 router = APIRouter()
 
-# The skill catalog is seeded from app/marketplace/seed.py; the broker_server
+# Single source of truth: the same agent-skills/ folder the Marvis app loads from.
+# The broker reads it directly (no key material needed — public keys stay empty here).
+_SKILLS_DIR = Path(__file__).resolve().parent.parent / "app" / "marketplace" / "agent-skills"
+
+# The skill catalog is seeded from the agent-skills/ folder; the broker_server
 # keeps its own copy for the HTTP endpoint (same data, served independently).
 _SKILLS: list[dict] = []
 
@@ -26,54 +33,38 @@ def set_skill_catalog(skills: list[dict]) -> None:
 
 
 def _default_catalog() -> list[dict]:
-    """Default seed catalog (broker_server's own copy, mirrors app/marketplace/seed.py)."""
-    return [
-        {
-            "skill_id": "skill-doc-writer",
-            "agent_name": "DocWriter",
-            "display_name": "Doc Writer",
-            "version": "1.0.0",
-            "description": (
-                "Writes content (tweets, scripts, articles) and saves the result "
-                "as a new Google Doc."
-            ),
-            "specialties": ["doc-writing", "content-writing", "twitter", "social-media"],
-            "instruction": (
-                "You are DocWriter, a specialist content creator. "
-                "Write the requested content and keep tweets under 280 characters."
-            ),
-            "model": "ollama/gemma2:2b",
-            "required_capabilities": [
-                {"mcp_server": "gdocs", "tool_name": "create_doc", "why": "Save content as a Google Doc"}
-            ],
-            "pricing": {"currency": "USD", "base_fee_cents": 50, "completion_fee_cents": 100},
-            "public_key": {},   # populated at startup from keys module
+    """Load the broker's catalog from the shared agent-skills/ folder.
+
+    Mirrors app/marketplace/seed.py so the broker and the orchestrator agree on
+    the exact same skill set, pricing, and capabilities.
+    """
+    if not _SKILLS_DIR.is_dir():
+        return []
+
+    catalog: list[dict] = []
+    for skill_dir in sorted(_SKILLS_DIR.iterdir()):
+        meta_path = skill_dir / "skill.json"
+        if not skill_dir.is_dir() or not meta_path.exists():
+            continue
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        instr_path = skill_dir / "instruction.md"
+        instruction = instr_path.read_text(encoding="utf-8").strip() if instr_path.exists() else ""
+        catalog.append({
+            "skill_id": meta["skill_id"],
+            "agent_name": meta["agent_name"],
+            "display_name": meta["display_name"],
+            "version": meta.get("version", "1.0.0"),
+            "description": meta["description"],
+            "specialties": meta["specialties"],
+            "instruction": instruction,
+            "model": meta.get("model", "ollama/gemma2:2b"),
+            "required_capabilities": meta["required_capabilities"],
+            "pricing": meta["pricing"],
+            "public_key": {},   # broker doesn't hold per-skill signing keys
             "io": {},
             "reputation": None,
-        },
-        {
-            "skill_id": "skill-doc-reader",
-            "agent_name": "DocReader",
-            "display_name": "Doc Reader",
-            "version": "1.0.0",
-            "description": (
-                "Reads and summarises the content of an existing Google Doc."
-            ),
-            "specialties": ["doc-reading", "research", "summarisation"],
-            "instruction": (
-                "You are DocReader, a specialist document analyst. "
-                "Read the provided document and return a concise summary."
-            ),
-            "model": "ollama/gemma2:2b",
-            "required_capabilities": [
-                {"mcp_server": "gdocs", "tool_name": "get_doc_content", "why": "Read the source document"}
-            ],
-            "pricing": {"currency": "USD", "base_fee_cents": 25, "completion_fee_cents": 50},
-            "public_key": {},
-            "io": {},
-            "reputation": None,
-        },
-    ]
+        })
+    return catalog
 
 
 @router.get("/.well-known/skills")

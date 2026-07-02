@@ -20,13 +20,21 @@ from app.config import OLLAMA_MODEL
 
 _INTAKE_PROMPT = """You are a task parser for Marvis, a personal AI orchestrator.
 
-Parse the user's request into a JSON object with EXACTLY these keys:
-- "type": string — task type, e.g. "doc_writing", "doc_reading", "content_writing"
-- "inputs": object — key/value pairs extracted from the request
-  For doc_writing tasks include: topic, tone, channel, doc_title
-- "acceptance_criteria": array of strings — objective, verifiable criteria
+Marvis has specialists for writing AND reviewing social posts on three platforms:
+twitter, instagram, and linkedin.
 
-For the flagship task "Write a tweet about my Marvis launch and save it as a Twitter script in Google Docs":
+Parse the user's request into a JSON object with EXACTLY these keys:
+- "type": string —
+    * "doc_writing"  → the user wants a NEW post written and saved to Google Docs
+    * "doc_reading"  → the user wants an EXISTING post (in a Google Doc) reviewed / critiqued
+- "inputs": object — key/value pairs extracted from the request. ALWAYS include:
+    * "channel": one of "twitter", "instagram", "linkedin" (infer it from the request)
+    For doc_writing also include: "topic", "tone", "doc_title"
+    For doc_reading also include: "doc_id" (the Google Doc id to review) if the user gave one
+- "acceptance_criteria": array of strings — objective, verifiable criteria.
+    Platform character limits: twitter 280, instagram 2200, linkedin 3000.
+
+Example — "Write a tweet about my Marvis launch and save it as a Twitter script in Google Docs":
 {
   "type": "doc_writing",
   "inputs": {
@@ -36,9 +44,22 @@ For the flagship task "Write a tweet about my Marvis launch and save it as a Twi
     "doc_title": "Twitter Scripts — Marvis launch"
   },
   "acceptance_criteria": [
-    "tweet body is <= 280 chars",
+    "post body is <= 280 chars",
     "create_doc returned a valid document_id (the doc was actually created)",
-    "the saved doc body contains the tweet text"
+    "the saved doc body contains the post text"
+  ]
+}
+
+Example — "Review my LinkedIn post in this doc: abc123":
+{
+  "type": "doc_reading",
+  "inputs": {
+    "channel": "linkedin",
+    "doc_id": "abc123"
+  },
+  "acceptance_criteria": [
+    "the review references the post's actual content",
+    "the review gives concrete, actionable feedback"
   ]
 }
 

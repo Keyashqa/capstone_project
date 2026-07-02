@@ -1,0 +1,21 @@
+{
+  "skill_id": "skill-instagram-reviewer",
+  "agent_name": "InstaPostReviewer",
+  "display_name": "Insta Post Reviewer",
+  "version": "1.0.0",
+  "description": "Reviews an existing Instagram caption stored in a Google Doc and gives improvement feedback. For critiquing and editing Instagram posts.",
+  "specialties": ["instagram", "insta", "instagram-post", "post-review", "post-reviewing", "doc-reading", "review", "research"],
+  "model": "ollama/gemma2:2b",
+  "required_capabilities": [
+    {
+      "mcp_server": "gdocs",
+      "tool_name": "get_doc_content",
+      "why": "Read the Instagram caption from Google Docs in order to review it"
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 25,
+    "completion_fee_cents": 50
+  }
+}

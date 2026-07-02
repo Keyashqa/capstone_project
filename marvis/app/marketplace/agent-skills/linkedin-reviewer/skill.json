@@ -1,0 +1,21 @@
+{
+  "skill_id": "skill-linkedin-reviewer",
+  "agent_name": "LinkedinPostReviewer",
+  "display_name": "LinkedIn Post Reviewer",
+  "version": "1.0.0",
+  "description": "Reviews an existing LinkedIn post stored in a Google Doc and gives improvement feedback. For critiquing and editing LinkedIn content.",
+  "specialties": ["linkedin", "linkedin-post", "post-review", "post-reviewing", "doc-reading", "review", "research"],
+  "model": "ollama/gemma2:2b",
+  "required_capabilities": [
+    {
+      "mcp_server": "gdocs",
+      "tool_name": "get_doc_content",
+      "why": "Read the LinkedIn post from Google Docs in order to review it"
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 25,
+    "completion_fee_cents": 50
+  }
+}

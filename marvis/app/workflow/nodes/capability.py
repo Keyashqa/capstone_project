@@ -42,10 +42,12 @@ async def grant_capability(node_input: dict[str, Any]) -> Any:
     # Arg constraints per tool (plan §4.5 / §7c)
     arg_constraints: dict = {}
     if tool_name == "create_doc":
-        arg_constraints = {
-            "title": 'prefix:"Twitter Scripts — "',
-            "content": {"max_len": 4000},
-        }
+        # Bind the grant to the exact document title the user approved at hire time,
+        # so the specialist can only create that one doc — not arbitrary documents.
+        doc_title = node_input.get("spec", {}).get("inputs", {}).get("doc_title", "")
+        arg_constraints = {"content": {"max_len": 4000}}
+        if doc_title:
+            arg_constraints["title"] = f'prefix:"{doc_title}"'
     elif tool_name == "get_doc_content":
         doc_id = node_input.get("spec", {}).get("inputs", {}).get("doc_id", "")
         if doc_id:
