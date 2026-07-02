@@ -54,3 +54,11 @@ USER_GOOGLE_EMAIL: str = _get("USER_GOOGLE_EMAIL", "")
 
 # ── Specialist dispatch ────────────────────────────────────────────────────────
 DISPATCH_TIMEOUT_SECONDS: int = int(_get("DISPATCH_TIMEOUT_SECONDS", "120"))
+
+# ── Marketplace commission (Phase 3 foundation — DEFINED, not yet applied) ────
+# When a LISTED skill is hired, the broker keeps COMMISSION_RATE_BPS of the
+# COMMISSION_BASIS tranche and routes the remainder to the owner. Penny-exact
+# rule (Phase 3): commission = (tranche * BPS) // 10000; owner = tranche - commission.
+# NOT wired into payout.py yet — pay_completion still pays 100% to the agent.
+COMMISSION_RATE_BPS: int = int(_get("COMMISSION_RATE_BPS", "1000"))   # 1000 bps = 10%
+COMMISSION_BASIS: str = _get("COMMISSION_BASIS", "completion")        # "completion" only

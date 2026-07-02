@@ -90,6 +90,51 @@ def marketplace_agents() -> dict:
     return {"agents": agents, "count": len(agents)}
 
 
+@app.get("/owned-skills")
+def owned_skills() -> dict:
+    """Marvis's OWNED skill library — built once via SkillBuilder, run free forever after.
+
+    Separate from /marketplace/agents: these are never for sale, never re-hired,
+    and never appear in the broker's catalog (plan2.md §P2-2).
+    """
+    from app.marketplace.seed import seed_owned_library
+    from app.marketplace.skill_registry import get_owned_registry
+
+    seed_owned_library()  # idempotent — picks up anything built before a restart
+    cards = get_owned_registry().list_cards()
+
+    skills = [
+        {
+            "skill_id": c.skill_id,
+            "agent_name": c.agent_name,
+            "display_name": c.display_name,
+            "version": c.version,
+            "description": c.description,
+            "specialties": c.specialties,
+            "model": c.model,
+            "instruction": c.instruction,
+            "capabilities": [
+                {"mcp_server": cap.mcp_server, "tool_name": cap.tool_name, "why": cap.why}
+                for cap in c.required_capabilities
+            ],
+        }
+        for c in cards
+    ]
+    return {"skills": skills, "count": len(skills)}
+
+
+@app.get("/platform/stats")
+def platform_stats() -> dict:
+    """Read-only, cross-user view of total money moved through the ledger so far.
+
+    Purely observational — reads the existing double-entry ledger (app/wallet.py:
+    get_platform_stats). Never writes, never touches payment/escrow/payout logic.
+    """
+    from app import wallet as wallet_ops
+
+    return wallet_ops.get_platform_stats()
+
+
 # Serve React UI build if it exists
 _DIST = Path(__file__).parent.parent / "frontend" / "dist"
 if _DIST.exists():

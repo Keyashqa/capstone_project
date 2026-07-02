@@ -9,6 +9,13 @@ On dispatch:
 
 M5: runtime loads skill and runs on Gemma (no tools yet).
 M6: adds the lent gdocs tool (in-proc allowlist enforcement).
+
+Phase 2 (plan2.md §P2-4): ONE new branch — when the worn skill is skill-builder
+(zero required_capabilities, no gdocs tool), the runtime instead asks Gemma to
+fill in a new SkillCard's `instruction` + `description`. Every safety-critical
+field (skill_id, agent_name, tool, specialties, pricing) is DERIVED by Marvis
+from the detected {platform, role}, never model-generated — this is the
+reliability decision that keeps a 2b model from fabricating a tool or identity.
 """
 from __future__ import annotations
 
@@ -20,7 +27,7 @@ import ollama
 
 from app.capability.grant import CapabilityGrant, InMemoryGrantRegistry
 from app.config import USER_GOOGLE_EMAIL
-from app.marketplace.skill_card import SkillCard
+from app.marketplace.skill_card import CapabilityRef, SkillCard, SkillPricing
 
 
 class SpecialistResult:
@@ -31,18 +38,131 @@ class SpecialistResult:
         output: str,
         doc_id: str | None = None,
         called_tools: list[dict] | None = None,
+        built_skill_card: SkillCard | None = None,
     ) -> None:
         self.agent_name = agent_name
         self.skill_id = skill_id
         self.output = output
         self.doc_id = doc_id
         self.called_tools: list[dict] = called_tools or []
+        self.built_skill_card = built_skill_card  # only set by the builder branch
+
+
+# ── Phase 2: builder branch — derives every safety-critical field itself ──────
+
+_ROLE_TOOL: dict[str, tuple[str, str]] = {
+    "writer": ("create_doc", "Save the written {platform} post as a Google Doc"),
+    "reviewer": ("get_doc_content", "Read the {platform} post from Google Docs in order to review it"),
+}
+_PLATFORM_WORD: dict[str, str] = {"twitter": "Twitter", "instagram": "Insta", "linkedin": "Linkedin"}
+_PLATFORM_LIMIT: dict[str, int] = {"twitter": 280, "instagram": 2200, "linkedin": 3000}
+_WRITER_PRICING = SkillPricing(base_fee_cents=50, completion_fee_cents=100)
+_REVIEWER_PRICING = SkillPricing(base_fee_cents=25, completion_fee_cents=50)
+
+
+def _assemble_skill_card(platform: str, role: str, instruction: str, description: str) -> SkillCard:
+    """Build the full SkillCard from Marvis-derived fields + the model's instruction/description.
+
+    The model NEVER chooses skill_id, agent_name, the tool, specialties, or
+    pricing — those come only from the closed {platform, role} gap Marvis
+    already detected deterministically in select_specialist (plan2.md §P2-4).
+    """
+    tool_name, why_template = _ROLE_TOOL[role]
+    platform_word = _PLATFORM_WORD.get(platform, platform.capitalize())
+    role_suffix = "Specialist" if role == "writer" else "Reviewer"
+    is_writer = role == "writer"
+
+    specialties = (
+        [platform, f"{platform}-post", "post-writing", "content-writing", "doc-writing", "social-media"]
+        if is_writer
+        else [platform, f"{platform}-post", "post-review", "post-reviewing", "doc-reading", "review"]
+    )
+
+    return SkillCard(
+        skill_id=f"skill-{platform}-{role}",
+        agent_name=f"{platform_word}Post{role_suffix}",
+        display_name=f"{platform.capitalize()} Post {role_suffix}",
+        version="1.0.0",
+        description=description.strip(),
+        specialties=specialties,
+        instruction=instruction.strip(),
+        model="ollama/gemma2:2b",
+        required_capabilities=[
+            CapabilityRef(mcp_server="gdocs", tool_name=tool_name, why=why_template.format(platform=platform))
+        ],
+        pricing=_WRITER_PRICING if is_writer else _REVIEWER_PRICING,
+        public_key={},  # placeholder — persist_skill mints the real, Marvis-owned key
+    )
+
+
+async def _generate_json_with_ollama(prompt: str, model_str: str) -> str:
+    ollama_model = model_str.replace("ollama/", "")
+    resp = await asyncio.to_thread(
+        ollama.chat,
+        model=ollama_model,
+        messages=[{"role": "user", "content": prompt}],
+        format="json",
+        options={"temperature": 0.2},
+    )
+    return resp["message"]["content"]
+
+
+async def _run_builder(
+    skill_card: SkillCard,
+    task_spec: dict[str, Any],
+    timeout_seconds: int,
+) -> SpecialistResult:
+    """Ask Gemma to write ONLY `instruction` + `description`; Marvis derives the rest.
+
+    Hardened the same way as intake_task: format="json" + schema validation +
+    ONE retry + graceful fail (empty output — validate_build then rejects it).
+    """
+    platform = task_spec.get("gap_platform", "") or task_spec.get("inputs", {}).get("channel", "")
+    role = task_spec.get("gap_role", "writer")
+    goal_nl = task_spec.get("goal_nl", "")
+    limit = _PLATFORM_LIMIT.get(platform, 280)
+
+    prompt = (
+        f"{skill_card.instruction}\n\n"
+        f"Gap to fill: platform={platform}, role={role}, character limit={limit}\n"
+        f"Original user goal: {goal_nl}\n"
+    )
+
+    built: dict | None = None
+    for attempt in range(2):
+        try:
+            raw = await asyncio.wait_for(
+                _generate_json_with_ollama(prompt, skill_card.model),
+                timeout=timeout_seconds,
+            )
+            candidate = json.loads(raw)
+            if not isinstance(candidate.get("instruction"), str) or not candidate["instruction"].strip():
+                raise ValueError("missing/empty instruction")
+            if not isinstance(candidate.get("description"), str) or not candidate["description"].strip():
+                raise ValueError("missing/empty description")
+            built = candidate
+            break
+        except Exception:
+            if attempt == 0:
+                continue
+
+    if built is None or not platform:
+        # Graceful fail — empty output makes validate_build reject deterministically.
+        return SpecialistResult(agent_name=skill_card.agent_name, skill_id=skill_card.skill_id, output="")
+
+    new_card = _assemble_skill_card(platform, role, built["instruction"], built["description"])
+    return SpecialistResult(
+        agent_name=skill_card.agent_name,
+        skill_id=skill_card.skill_id,
+        output=new_card.model_dump_json(),
+        built_skill_card=new_card,
+    )
 
 
 async def run_specialist(
     skill_card: SkillCard,
     task_spec: dict[str, Any],
-    grant: CapabilityGrant,
+    grant: CapabilityGrant | None,
     grant_registry: InMemoryGrantRegistry,
     timeout_seconds: int = 20,
 ) -> SpecialistResult:
@@ -50,7 +170,11 @@ async def run_specialist(
 
     M5: Gemma generates the text output (no tool calls yet).
     M6: Also calls the lent gdocs MCP tool via the grant allowlist.
+    Phase 2: the builder (zero caps) branches into _run_builder — no tool, no grant.
     """
+    if skill_card.skill_id == "skill-builder":
+        return await _run_builder(skill_card, task_spec, timeout_seconds)
+
     inputs = task_spec.get("inputs", {})
     goal = task_spec.get("goal_nl", "")
 

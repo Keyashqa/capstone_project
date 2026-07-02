@@ -1,37 +1,45 @@
 """Marvis — ADK Workflow graph (deterministic control flow).
 
-Graph topology (§5 of plan.md):
+Graph topology (§5 of plan.md; Phase 2 splice per plan2.md §P2-5.0):
   START
     └─▶ intake_task            Gemma parses goal_nl → spec
-          └─▶ discover_specialists   fetches SkillCards, filters by specialty
+          └─▶ discover_specialists   fetches SkillCards from BOTH stores
                 ├─[none]─▶ no_specialist_terminal
-                └─[found]─▶ select_specialist   rule-match → AgentCard (deterministic agent_name)
-                      └─▶ authorize_base_payment   *** PIN GATE #1 ***
-                            ├─[cancelled]─▶ cancelled_terminal
-                            └─[confirmed]─▶ create_hire_checkout   UCP CartMandate
-                                  └─▶ verify_hire_cart
-                                        ├─[invalid]─▶ hire_invalid_terminal
-                                        └─[valid]──▶ pay_base_into_escrow   AP2 + ledger escrow
-                                                    └─▶ grant_capability   mint CapabilityGrant
-                                                          └─▶ dispatch_to_specialist   run Gemma+tool
-                                                                └─▶ collect_result
-                                                                      └─▶ revoke_capability   ALWAYS
-                                                                            └─▶ verify_work   det+advisory
-                                                                                  ├─[hard_fail]─▶ verify_failed ─▶ refunded_terminal
-                                                                                  └─[checks_pass]─▶ approve_payout  *** PIN GATE #2 ***
-                                                                                        ├─[rejected]─▶ verify_failed ─▶ refunded_terminal
-                                                                                        └─[approved]─▶ pay_completion
-                                                                                              └─▶ settle_escrow
-                                                                                                    └─▶ receipt_terminal
+                └─[found]─▶ select_specialist   rule-match over market ∪ owned
+                      ├─[market]─▶ authorize_base_payment   *** PIN GATE #1 *** (rented skill)
+                      │                 ├─[cancelled]─▶ cancelled_terminal
+                      │                 └─[confirmed]─▶ create_hire_checkout ─▶ verify_hire_cart
+                      │                                       ├─[invalid]─▶ hire_invalid_terminal
+                      │                                       └─[valid]──▶ pay_base_into_escrow ─┐
+                      ├─[owned]───▶ grant_capability (self-issued, FREE) ◀──────────────────────┘
+                      │                 ├─[grant_failed]───▶ verify_failed ─▶ refunded_terminal
+                      │                 └─[granted]───▶ dispatch_to_specialist  (0-cap skills dispatch w/o a token)
+                      │                       ├─[dispatch_failed]─▶ revoke_capability
+                      │                       └─[dispatched]───────▶ collect_result ─▶ revoke_capability
+                      │                             ├─[post_work]──▶ verify_work
+                      │                             │     ├─[hard_fail|owned_hard_fail]───▶ verify_failed / output_failed_terminal
+                      │                             │     └─[checks_pass]──▶ approve_payout *** PIN GATE #2 ***
+                      │                             │           ├─[rejected]─▶ verify_failed ─▶ refunded_terminal
+                      │                             │           └─[approved]─▶ pay_completion ─▶ settle_escrow ─▶ receipt_terminal
+                      │                             │     [owned_checks_pass]──▶ receipt_terminal (nothing to release)
+                      │                             └─[post_build]─▶ validate_build   (builder dispatch only)
+                      │                                   ├─[invalid]─▶ build_failed ─▶ refunded_terminal
+                      │                                   └─[valid]───▶ pay_completion ─▶ settle_escrow ─▶ persist_skill
+                      │                                                       (writes OWNED library, loops back ↺ to discover_specialists)
+                      └─[gap]─────▶ propose_build   *** PIN GATE #B *** (commission SkillBuilder — real seller)
+                                          ├─[cancelled]─▶ cancelled_terminal
+                                          └─[confirmed]─▶ create_hire_checkout ─▶ ... ─▶ grant_capability (builder, 0 caps)
 
 The Workflow is deterministic — no LLM at the routing level.
-LLM (local Gemma/Ollama) is used inside: intake_task, verify_work (advisory), specialist runtime.
+LLM (local Gemma/Ollama) is used inside: intake_task, verify_work (advisory), specialist runtime
+(incl. the Phase 2 builder branch, which only writes the `instruction` field — plan2.md §P2-4).
 """
 from __future__ import annotations
 
 from google.adk.apps import App, ResumabilityConfig
 from google.adk.workflow import Workflow
 
+from app.workflow.nodes.build import build_failed, persist_skill, propose_build, validate_build
 from app.workflow.nodes.capability import grant_capability, revoke_capability
 from app.workflow.nodes.dispatch import collect_result, dispatch_to_specialist
 from app.workflow.nodes.discover import discover_specialists, select_specialist
@@ -47,6 +55,7 @@ from app.workflow.nodes.terminals import (
     cancelled_terminal,
     hire_invalid_terminal,
     no_specialist_terminal,
+    output_failed_terminal,
     receipt_terminal,
     refunded_terminal,
     verify_failed,
@@ -54,10 +63,11 @@ from app.workflow.nodes.terminals import (
 from app.workflow.nodes.verify import verify_work
 
 # ── Seed the skill catalog on startup ─────────────────────────────────────────
-# (imported here so the registry is populated before any request arrives)
-from app.marketplace.seed import seed_catalog  # noqa: F401, E402
+# (imported here so the registries are populated before any request arrives)
+from app.marketplace.seed import seed_catalog, seed_owned_library  # noqa: F401, E402
 
 seed_catalog()
+seed_owned_library()  # Phase 2: Marvis's owned-skills library (survives restart)
 
 # ── Marvis Workflow graph ──────────────────────────────────────────────────────
 
@@ -83,13 +93,20 @@ root_agent = Workflow(
         }),
 
         (select_specialist, {
-            "none":     no_specialist_terminal,
-            "selected": authorize_base_payment,
+            "none":   no_specialist_terminal,
+            "market": authorize_base_payment,             # rented skill — Phase 1 hire loop
+            "owned":  grant_capability,                    # owned skill — self-issued, FREE run
+            "gap":    propose_build,                       # capability gap — commission the builder
         }),
 
         (authorize_base_payment, {
             "cancelled": cancelled_terminal,
             "confirmed": create_hire_checkout,
+        }),
+
+        (propose_build, {                                  # *** PIN GATE #B ***
+            "cancelled": cancelled_terminal,
+            "confirmed": create_hire_checkout,             # nested Phase 1 hire of skill-builder
         }),
 
         (create_hire_checkout, verify_hire_cart),
@@ -103,7 +120,7 @@ root_agent = Workflow(
 
         (grant_capability, {
             "grant_failed": verify_failed,
-            "granted":      dispatch_to_specialist,
+            "granted":      dispatch_to_specialist,  # incl. zero-cap skills (builder) — no token minted
         }),
 
         (dispatch_to_specialist, {
@@ -113,11 +130,16 @@ root_agent = Workflow(
 
         (collect_result, revoke_capability),
 
-        (revoke_capability, verify_work),
+        (revoke_capability, {
+            "post_work":  verify_work,                   # normal task output (market or owned)
+            "post_build": validate_build,                # builder's SkillCard deliverable
+        }),
 
         (verify_work, {
-            "hard_fail":   verify_failed,
-            "checks_pass": approve_payout,
+            "hard_fail":         verify_failed,
+            "checks_pass":       approve_payout,
+            "owned_hard_fail":   output_failed_terminal,  # owned run failed — free, nothing to refund
+            "owned_checks_pass": receipt_terminal,        # owned run passed — free, nothing to release
         }),
 
         (approve_payout, {
@@ -125,11 +147,23 @@ root_agent = Workflow(
             "approved": pay_completion,
         }),
 
+        (validate_build, {
+            "invalid": build_failed,
+            "valid":   pay_completion,                    # releases the ONE-TIME build purchase
+        }),
+
         (pay_completion, settle_escrow),
 
-        (settle_escrow, receipt_terminal),
+        (settle_escrow, {
+            "settled":       receipt_terminal,            # market hire complete
+            "build_settled": persist_skill,                # build purchase complete → write owned skill
+        }),
+
+        (persist_skill, discover_specialists),            # ↺ loop back — original task now finds it "owned"
 
         (verify_failed, refunded_terminal),
+
+        (build_failed, refunded_terminal),
     ],
 )
 

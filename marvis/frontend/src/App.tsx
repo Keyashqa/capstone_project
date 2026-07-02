@@ -4,10 +4,12 @@ import Auth from './pages/Auth'
 import Wallet from './pages/Wallet'
 import Chat from './pages/Chat'
 import Marketplace from './pages/Marketplace'
+import OwnedSkills from './pages/OwnedSkills'
+import PlatformVolume from './pages/PlatformVolume'
 import type { AuthState } from './api'
 import './App.css'
 
-type Page = 'landing' | 'auth' | 'wallet' | 'chat' | 'marketplace'
+type Page = 'landing' | 'auth' | 'wallet' | 'chat' | 'marketplace' | 'owned-skills' | 'platform'
 
 const STORAGE_KEY = 'marvis_auth'
 
@@ -86,6 +88,28 @@ export default function App() {
   if (page === 'marketplace') {
     return (
       <Marketplace
+        email={auth.email}
+        balanceCents={auth.balanceCents}
+        onNavigate={setPage}
+        onLogout={handleLogout}
+      />
+    )
+  }
+
+  if (page === 'owned-skills') {
+    return (
+      <OwnedSkills
+        email={auth.email}
+        balanceCents={auth.balanceCents}
+        onNavigate={setPage}
+        onLogout={handleLogout}
+      />
+    )
+  }
+
+  if (page === 'platform') {
+    return (
+      <PlatformVolume
         email={auth.email}
         balanceCents={auth.balanceCents}
         onNavigate={setPage}

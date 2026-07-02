@@ -229,3 +229,70 @@ def get_all_account_sum() -> int:
         ).fetchone()["total"]
     finally:
         conn.close()
+
+
+def get_platform_stats(feed_limit: int = 50) -> dict:
+    """Read-only, cross-user aggregate view of money already moved through the ledger.
+
+    Purely observational: every number here is a SUM/GROUP BY/COUNT over the SAME
+    `ledger` rows every wallet/escrow operation already writes (deposit, hold_in_escrow,
+    release_to_agent, refund_from_escrow). No new account, no new table, no split logic —
+    this never writes to the ledger, only reads it.
+
+    Each double-entry journal writes one negative row (debit) and one positive row
+    (credit) sharing a journal_id. Filtering delta_cents > 0 picks exactly one row per
+    money-movement event (the receiving side), so counts/feeds below aren't doubled.
+    """
+    conn = get_conn()
+    try:
+        def _sum(where: str) -> int:
+            return conn.execute(
+                f"SELECT COALESCE(SUM(delta_cents), 0) AS s FROM ledger WHERE {where}"
+            ).fetchone()["s"]
+
+        # "hire_escrow" is written for every hire — a normal marketplace rental AND
+        # a Phase 2 skill-builder commission both flow through the same node, so this
+        # is the total volume ever committed to a hire, platform-wide.
+        total_volume_cents = _sum("reason = 'hire_escrow' AND delta_cents > 0")
+        total_paid_to_agents_cents = _sum("account_id LIKE 'agent:%' AND delta_cents > 0")
+        total_refunded_cents = _sum(
+            "reason IN ('completion_refund', 'build_completion_refund') AND delta_cents > 0"
+        )
+        total_topped_up_cents = _sum("reason = 'topup' AND delta_cents > 0")
+
+        hire_count = conn.execute(
+            "SELECT COUNT(DISTINCT journal_id) AS n FROM ledger WHERE reason = 'hire_escrow'"
+        ).fetchone()["n"]
+
+        per_agent_rows = conn.execute(
+            """SELECT account_id, SUM(delta_cents) AS earned
+                 FROM ledger
+                WHERE account_id LIKE 'agent:%' AND delta_cents > 0
+                GROUP BY account_id
+                ORDER BY earned DESC"""
+        ).fetchall()
+
+        feed_rows = conn.execute(
+            """SELECT journal_id, account_id AS to_account, counterpart AS from_account,
+                      delta_cents AS amount_cents, reason, reference_id, created_at
+                 FROM ledger
+                WHERE delta_cents > 0
+                ORDER BY created_at DESC, rowid DESC
+                LIMIT ?""",
+            (feed_limit,),
+        ).fetchall()
+
+        return {
+            "total_volume_cents": total_volume_cents,
+            "total_paid_to_agents_cents": total_paid_to_agents_cents,
+            "total_refunded_cents": total_refunded_cents,
+            "total_topped_up_cents": total_topped_up_cents,
+            "hire_count": hire_count,
+            "per_agent": [
+                {"agent_name": r["account_id"].removeprefix("agent:"), "earned_cents": r["earned"]}
+                for r in per_agent_rows
+            ],
+            "feed": [dict(r) for r in feed_rows],
+        }
+    finally:
+        conn.close()

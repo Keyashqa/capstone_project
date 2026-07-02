@@ -97,6 +97,56 @@ export async function apiGetAgents(): Promise<MarketAgent[]> {
   return d.agents as MarketAgent[]
 }
 
+export interface OwnedSkill {
+  skill_id: string
+  agent_name: string
+  display_name: string
+  version: string
+  description: string
+  specialties: string[]
+  model: string
+  instruction: string
+  capabilities: AgentCapability[]
+}
+
+export async function apiGetOwnedSkills(): Promise<OwnedSkill[]> {
+  const r = await fetch(`${AGENT}/owned-skills`)
+  if (!r.ok) throw new Error('Failed to load owned skills')
+  const d = await r.json()
+  return d.skills as OwnedSkill[]
+}
+
+export interface PlatformFeedEvent {
+  journal_id: string
+  to_account: string
+  from_account: string
+  amount_cents: number
+  reason: string
+  reference_id: string | null
+  created_at: string
+}
+
+export interface PlatformAgentEarnings {
+  agent_name: string
+  earned_cents: number
+}
+
+export interface PlatformStats {
+  total_volume_cents: number
+  total_paid_to_agents_cents: number
+  total_refunded_cents: number
+  total_topped_up_cents: number
+  hire_count: number
+  per_agent: PlatformAgentEarnings[]
+  feed: PlatformFeedEvent[]
+}
+
+export async function apiGetPlatformStats(): Promise<PlatformStats> {
+  const r = await fetch(`${AGENT}/platform/stats`)
+  if (!r.ok) throw new Error('Failed to load platform stats')
+  return r.json()
+}
+
 export interface JobReceipt {
   task_id: string
   goal: string

@@ -62,15 +62,19 @@ def user_public_key_for(user_id: str) -> JWK:
 
 
 # ── Per-skill keys (A9: each SkillCard has its own keypair) ───────────────────
-# Key name: "skill-<skill_id>"  e.g. "skill-doc-writer"
+# Key name: "skill-<owner_id>-<skill_id>"  e.g. "skill-marvis-skill-doc-writer".
+# owner_id namespaces the keypair so two owners of the same slug never share an
+# identity (audit §5). Defaults to "marvis" — Phase 1/2 skills mint under the new
+# naming; nothing in the money path verifies these signatures, so the re-mint is
+# additive.
 
-def skill_private_key(skill_id: str) -> JWK:
-    return _load_or_generate(f"skill-{skill_id}")
+def skill_private_key(skill_id: str, owner_id: str = "marvis") -> JWK:
+    return _load_or_generate(f"skill-{owner_id}-{skill_id}")
 
 
-def skill_public_key(skill_id: str) -> JWK:
-    return JWK.from_json(skill_private_key(skill_id).export_public())
+def skill_public_key(skill_id: str, owner_id: str = "marvis") -> JWK:
+    return JWK.from_json(skill_private_key(skill_id, owner_id).export_public())
 
 
-def skill_public_key_dict(skill_id: str) -> dict:
-    return json.loads(skill_public_key(skill_id).export_public())
+def skill_public_key_dict(skill_id: str, owner_id: str = "marvis") -> dict:
+    return json.loads(skill_public_key(skill_id, owner_id).export_public())

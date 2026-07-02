@@ -2,6 +2,12 @@
 
 M5: runtime loads skill + runs Gemma (no tools) — returns tweet draft.
 M6: runtime uses the lent gdocs tool via the grant_token.
+
+Phase 2 (plan2.md §P2-5b/§P2-2): two small adapts.
+  1. The skill_card may live in EITHER store — read `skill_store` (set by
+     select_specialist, defaults to "market" for the builder hire sub-flow).
+  2. A skill with zero required_capabilities (the builder) is dispatched
+     WITHOUT a grant_token — grant is None, run_specialist branches on skill_id.
 """
 from __future__ import annotations
 
@@ -15,7 +21,7 @@ import json
 
 from app.capability.grant import get_grant_registry
 from app.config import DISPATCH_TIMEOUT_SECONDS
-from app.marketplace.skill_registry import get_registry
+from app.marketplace.skill_registry import get_owned_registry, get_registry
 from app.runtime.specialist import run_specialist
 
 CATALOG_ID = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
@@ -77,24 +83,32 @@ async def dispatch_to_specialist(node_input: dict[str, Any]) -> Any:
     skill_id: str = node_input.get("selected_skill_id", "")
     grant_token: str = node_input.get("grant_token", "")
     spec: dict = node_input.get("spec", {})
+    skill_store: str = node_input.get("skill_store", "market")
 
-    registry = get_registry()
+    registry = get_owned_registry() if skill_store == "owned" else get_registry()
     skill_card = registry.get(skill_id)
 
     grant_registry = get_grant_registry()
-    grant = grant_registry.get_by_token(grant_token)
-    if grant is None:
-        return Event(
-            output=node_input,
-            route="dispatch_failed",
-            content=_content(f"Grant not found for token. Was grant_capability skipped?"),
-        )
+    grant = None
+    if skill_card.required_capabilities:
+        grant = grant_registry.get_by_token(grant_token)
+        if grant is None:
+            return Event(
+                output=node_input,
+                route="dispatch_failed",
+                content=_content(f"Grant not found for token. Was grant_capability skipped?"),
+            )
 
     try:
         result = await asyncio.wait_for(
             run_specialist(
                 skill_card=skill_card,
-                task_spec={**spec, "goal_nl": node_input.get("goal_nl", "")},
+                task_spec={
+                    **spec,
+                    "goal_nl": node_input.get("goal_nl", ""),
+                    "gap_platform": node_input.get("gap_platform"),
+                    "gap_role": node_input.get("gap_role"),
+                },
                 grant=grant,
                 grant_registry=grant_registry,
                 timeout_seconds=DISPATCH_TIMEOUT_SECONDS,
@@ -134,6 +148,7 @@ async def dispatch_to_specialist(node_input: dict[str, Any]) -> Any:
                 "doc_id": result.doc_id,
                 "called_tools": result.called_tools,
             },
+            "built_skill_card": result.built_skill_card.model_dump() if result.built_skill_card else None,
         },
         content=_content(
             f"{result.agent_name} completed the task."

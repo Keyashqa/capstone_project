@@ -240,13 +240,21 @@ async def pay_completion(node_input: dict[str, Any]) -> Any:
 # ── settle_escrow ──────────────────────────────────────────────────────────────
 
 async def settle_escrow(node_input: dict[str, Any]) -> Any:
-    """Assert escrow:{task_id} == 0 and close the HiringTxn."""
+    """Assert escrow:{task_id} == 0 and close the HiringTxn.
+
+    Phase 2: this settles TWO different purchases with the same node — a normal
+    market hire (→ receipt_terminal) or the one-time build purchase (→
+    persist_skill, which writes the owned skill and loops back to the original
+    task). Route on which skill was hired.
+    """
     task_id: str = node_input.get("task_id", "")
+    is_builder = node_input.get("selected_skill_id") == "skill-builder"
     balance = await get_escrow_balance(task_id)
 
     if balance != 0:
         return Event(
             output={**node_input, "escrow_balance_after": balance},
+            route="build_settled" if is_builder else "settled",
             content=_content(
                 f"WARNING: escrow:{task_id} balance is {balance}¢ after settlement "
                 f"(expected 0). Double-entry invariant may be violated."
@@ -255,5 +263,6 @@ async def settle_escrow(node_input: dict[str, Any]) -> Any:
 
     return Event(
         output={**node_input, "escrow_balance_after": 0},
+        route="build_settled" if is_builder else "settled",
         content=_content(f"Escrow settled: escrow:{task_id} == 0. HiringTxn closed."),
     )

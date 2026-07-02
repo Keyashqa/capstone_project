@@ -1,0 +1,15 @@
+{
+  "skill_id": "skill-builder",
+  "agent_name": "SkillBuilder",
+  "display_name": "Skill Builder",
+  "version": "1.0.0",
+  "description": "Designs and commissions a NEW specialist skill when no existing skill covers a task. Outputs a SkillCard; composes only over existing tools.",
+  "specialties": ["skill-building", "meta", "commission", "capability-gap"],
+  "model": "ollama/gemma2:2b",
+  "required_capabilities": [],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 100,
+    "completion_fee_cents": 150
+  }
+}

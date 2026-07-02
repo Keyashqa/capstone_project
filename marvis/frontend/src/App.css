@@ -254,7 +254,14 @@ button { font-family: var(--font); }
     radial-gradient(240px 200px at 0% 120%, rgba(255,255,255,.10), transparent 70%);
   pointer-events: none;
 }
-.balance-label { position: relative; color: rgba(255,255,255,.82); font-size: .82rem; font-weight: 500; letter-spacing: .02em; }
+.balance-label { position: relative; display: flex; align-items: center; justify-content: space-between; gap: .75rem; color: rgba(255,255,255,.82); font-size: .82rem; font-weight: 500; letter-spacing: .02em; }
+.volume-refresh {
+  background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.3); border-radius: var(--r-pill);
+  color: #fff; font-size: .74rem; font-weight: 700; padding: .3rem .7rem; cursor: pointer;
+  transition: background .14s;
+}
+.volume-refresh:hover:not(:disabled) { background: rgba(255,255,255,.26); }
+.volume-refresh:disabled { opacity: .7; cursor: default; }
 .balance-amount { position: relative; font-size: 3rem; font-weight: 700; letter-spacing: -.03em; line-height: 1.1; margin-top: .15rem; }
 .topup-row { position: relative; display: flex; gap: .55rem; margin-top: 1.5rem; flex-wrap: wrap; align-items: center; }
 .topup-hint { font-size: .8rem; color: rgba(255,255,255,.8); margin-right: .25rem; font-weight: 500; }
@@ -1036,6 +1043,74 @@ section h3 {
   box-shadow: var(--shadow-blue); transition: background .14s;
 }
 .agent-hire:hover { background: var(--primary-dark); }
+
+/* ── Platform Volume (cross-user ledger dashboard) ───────────────────── */
+.platform-stats-row { margin: 0 0 2rem; flex-wrap: wrap; }
+.platform-stats-row .market-stat { flex: 1; min-width: 130px; }
+
+/* ── Owned Skills (concise cards + detail modal) ─────────────────────── */
+.owned-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+.owned-card {
+  display: flex; flex-direction: column; text-align: left;
+  background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--r-md);
+  padding: 1.1rem; cursor: pointer; font-family: var(--font);
+  box-shadow: var(--shadow-sm); transition: transform .14s, box-shadow .14s;
+}
+.owned-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+.owned-card-top { display: flex; align-items: center; gap: .6rem; }
+.owned-avatar {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; font-weight: 800; color: #fff;
+}
+.owned-avatar-lg { width: 48px; height: 48px; border-radius: 12px; font-size: 1.3rem; }
+.owned-id { flex: 1; min-width: 0; }
+.owned-name { font-size: .95rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.owned-handle { font-size: .74rem; color: var(--text-faint); font-weight: 500; }
+.owned-badge {
+  font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--green); background: var(--green-bg); border-radius: var(--r-pill);
+  padding: .22rem .55rem; white-space: nowrap; flex-shrink: 0;
+}
+.owned-desc {
+  font-size: .82rem; line-height: 1.5; color: var(--text-muted); margin: .75rem 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.owned-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; font-size: .74rem; }
+.owned-tag-count { color: var(--text-faint); font-weight: 600; }
+.owned-expand-hint { color: var(--primary); font-weight: 700; }
+
+/* ── Modal (generic popup, reused for owned-skill detail) ────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(20, 22, 26, .5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.5rem; z-index: 60;
+}
+.modal-card {
+  position: relative; background: var(--surface); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg); max-width: 560px; width: 100%;
+  max-height: 85vh; overflow-y: auto; padding: 1.75rem;
+}
+.modal-close {
+  position: absolute; top: .9rem; right: .9rem; width: 30px; height: 30px;
+  border-radius: 50%; border: none; background: var(--surface-2); color: var(--text-muted);
+  font-size: .85rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: var(--border-light); color: var(--text); }
+
+.owned-detail-top { display: flex; align-items: center; gap: .85rem; padding-right: 2rem; }
+.owned-detail-name { font-size: 1.15rem; font-weight: 800; color: var(--text); }
+.owned-detail-desc { font-size: .92rem; line-height: 1.6; color: var(--text-muted); margin: 1rem 0; }
+.owned-detail-tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: 1rem; }
+.owned-detail-cap { margin-bottom: 1rem; }
+.owned-detail-instruction { margin-bottom: 1.1rem; }
+.owned-detail-instruction pre {
+  white-space: pre-wrap; word-break: break-word; font-family: var(--font);
+  font-size: .82rem; line-height: 1.55; color: var(--text-2);
+  background: var(--surface-2); border: 1px solid var(--border-light); border-radius: var(--r-sm);
+  padding: .8rem .9rem; margin: .4rem 0 0;
+}
+.owned-detail-foot { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding-top: .9rem; border-top: 1px dashed var(--border); }
 
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 900px) {

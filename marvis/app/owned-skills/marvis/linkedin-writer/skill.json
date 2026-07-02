@@ -1,0 +1,28 @@
+{
+  "skill_id": "skill-linkedin-writer",
+  "agent_name": "LinkedinPostSpecialist",
+  "display_name": "Linkedin Post Specialist",
+  "version": "1.0.0",
+  "description": "Develops a LinkedIn post to announce the launch of Marvis, focusing on user benefits and key features.",
+  "specialties": [
+    "linkedin",
+    "linkedin-post",
+    "post-writing",
+    "content-writing",
+    "doc-writing",
+    "social-media"
+  ],
+  "model": "ollama/gemma2:2b",
+  "required_capabilities": [
+    {
+      "mcp_server": "gdocs",
+      "tool_name": "create_doc",
+      "why": "Save the written linkedin post as a Google Doc"
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 50,
+    "completion_fee_cents": 100
+  }
+}

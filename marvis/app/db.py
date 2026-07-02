@@ -181,5 +181,19 @@ def init_db() -> None:
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_receipts_user ON job_receipts(user_id)")
 
+    # ── Skill ownership (Phase 3 foundation — schema only, not yet populated) ──
+    # Maps a listed skill to its owner + the ledger account its 90% share will
+    # route to. Skill CONTENT stays on disk (skill.json + instruction.md); this
+    # table only records ownership + payout routing. No split logic uses it yet.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS skill_ownership (
+            owner_id      TEXT NOT NULL,
+            skill_id      TEXT NOT NULL,
+            owner_account TEXT,                         -- e.g. "agent:owner:<owner_id>"; NULL ⇒ unowned
+            listed_at     TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY (owner_id, skill_id)
+        )
+    """)
+
     conn.commit()
     conn.close()

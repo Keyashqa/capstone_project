@@ -1,27 +1,38 @@
 ================================================================================
   MARVIS — Personal AI Orchestrator  |  End-to-End Tutorial & Sample Run
-  Capstone Project | Date: 2026-07-01
+  Capstone Project | Phase 1 + Phase 2 (self-extending registry) | 2026-07-02
 ================================================================================
 
 WHAT IS MARVIS?
 ---------------
 Marvis is an AI orchestrator that:
   1. Accepts a natural-language task from you ("Write a tweet…")
-  2. Finds the right specialist agent from a marketplace
-  3. Shows you the price, waits for your PIN to authorise payment
-  4. Puts funds in ESCROW (never paid upfront)
-  5. Dispatches the specialist (local Gemma via Ollama)
-  6. Verifies the work deterministically (≤280 chars, doc created, etc.)
-  7. Shows you the result + advisory AI score
-  8. Waits for your second PIN to release the completion payment
-  9. Settles the escrow, emits a receipt
+  2. Finds the right specialist agent — from its MARKETPLACE (rented, pay-per-use)
+     or from its own OWNED library (built once, runs free forever after)
+  3. If NO skill covers the request (a genuine capability gap), Marvis hires a
+     SkillBuilder to COMMISSION a brand-new specialist — a one-time purchase —
+     then owns that specialist outright from then on
+  4. Shows you the price, waits for your PIN to authorise payment
+  5. Puts funds in ESCROW (never paid upfront)
+  6. Dispatches the specialist (local Gemma via Ollama)
+  7. Verifies the work deterministically (char limits, doc created, etc.)
+  8. Shows you the result + advisory AI score
+  9. Waits for a second PIN to release the completion payment (market hires only —
+     owned-skill runs are free and skip this entirely)
+ 10. Settles the escrow, emits a receipt
 
-THREE SERVERS THAT MUST BE RUNNING
+Phase 1 = hire → pay → dispatch → verify → settle, for a fixed marketplace of skills.
+Phase 2 = when the marketplace has a genuine hole, Marvis SELF-EXTENDS: it commissions
+          a new skill once, then serves that platform for free forever after.
+
+FOUR SERVERS THAT MUST BE RUNNING
 ------------------------------------
   Terminal 1:  ./run_marvis.sh     → http://localhost:8000  (ADK agent)
   Terminal 2:  ./run_broker.sh     → http://localhost:8002  (marketplace)
   Terminal 3:  ./run_proxy.sh      → http://localhost:8003  (proxy stub)
   Terminal 4:  ./run_frontend.sh   → http://localhost:5173  (React UI)
+
+  All commands below assume your shell's working directory is marvis/.
 
 QUICK HEALTH CHECK (run these in a new terminal)
 -------------------------------------------------
@@ -31,35 +42,43 @@ QUICK HEALTH CHECK (run these in a new terminal)
   curl http://localhost:8000/marvis/health
   → {"status":"ok","service":"marvis","model":"ollama/gemma2:2b"}
 
-  curl http://localhost:8002/.well-known/agent-card
-  → {"name":"Marvis Broker","description":"...","public_key":{...},...}
+  curl http://localhost:8002/health
+  → {"status":"ok","service":"marvis-broker"}
 
   curl http://localhost:8003/health
-  → {"status":"ok","service":"marvis-proxy","note":"Stub..."}
+  → {"status":"ok","service":"marvis-proxy","note":"Stub…"}
 
-MARKETPLACE CATALOG (what skills are available)
-------------------------------------------------
-  curl http://localhost:8002/.well-known/skills
-  → [
-      {
-        "skill_id": "skill-doc-writer",
-        "agent_name": "DocWriter",
-        "display_name": "Doc Writer",
-        "description": "Writes content (tweets, scripts, articles) and saves as a Google Doc.",
-        "specialties": ["doc-writing","content-writing","twitter","social-media"],
-        "pricing": { "base_fee_cents": 50, "completion_fee_cents": 100 },
-        "required_capabilities": [{ "mcp_server":"gdocs","tool_name":"create_doc" }]
-      },
-      {
-        "skill_id": "skill-doc-reader",
-        "agent_name": "DocReader",
-        "display_name": "Doc Reader",
-        "description": "Reads and summarises an existing Google Doc.",
-        "specialties": ["doc-reading","research","summarisation"],
-        "pricing": { "base_fee_cents": 25, "completion_fee_cents": 50 },
-        "required_capabilities": [{ "mcp_server":"gdocs","tool_name":"get_doc_content" }]
-      }
-    ]
+MARKETPLACE CATALOG (skills Marvis RENTS, pay-per-use)
+--------------------------------------------------------
+  curl http://localhost:8000/marketplace/agents
+  (equivalently: curl http://localhost:8002/.well-known/skills)
+
+  → 5 skills, twitter and instagram only — NOTE: no LinkedIn skill lives here.
+    LinkedIn is the deliberate hole that demonstrates Phase 2's self-extension.
+
+      skill-twitter-writer     TwitterPostSpecialist   $0.50 / $1.00   create_doc
+      skill-twitter-reviewer   TwitterPostReviewer     $0.25 / $0.50   get_doc_content
+      skill-instagram-writer   InstaPostSpecialist     $0.50 / $1.00   create_doc
+      skill-instagram-reviewer InstaPostReviewer       $0.25 / $0.50   get_doc_content
+      skill-builder            SkillBuilder            $1.00 / $1.50   (no tool — it
+                                                                         writes SkillCards,
+                                                                         not doc content)
+
+  This catalog NEVER changes at runtime — skill-builder's OUTPUT never lands here.
+
+OWNED LIBRARY (skills Marvis BUILT and now runs for FREE)
+-------------------------------------------------------------
+  Starts EMPTY on a clean checkout. Populated only by a successful build.
+  Lives on disk at:  app/owned-skills/<slug>/{skill.json, instruction.md}
+  Survives a restart (re-seeded at startup) — but is invisible to the broker's
+  /.well-known/skills forever; Marvis owns it, it is never for sale.
+
+  Check what Marvis currently owns:
+    ls app/owned-skills/
+
+  To reset the demo and see the FULL gap→build flow from scratch:
+    rm -rf app/owned-skills/linkedin-writer
+    (then restart ./run_marvis.sh)
 
 ================================================================================
   OPTION A — USE THE REACT WEB UI (Recommended for demo)
@@ -72,116 +91,89 @@ STEP 2: Click "Don't have an account? Register"
     Email:    yourname@example.com
     Password: anything (e.g. test1234)
     PIN:      4–6 digits you'll remember (e.g. 1234)
-              ← this PIN authorises payments; keep it handy
+              ← this PIN authorises every payment prompt; keep it handy
 
 STEP 3: You land on the Wallet page.
   Top up your balance first — click one of the green buttons:
     [+ $5.00]  [+ $10.00]  [+ $20.00]  [+ $50.00]
-  The flagship task costs $1.50 total ($0.50 base + $1.00 completion).
-  Top up at least $5.00 to have plenty of room.
+  Top up at least $5.00 — the build flow costs $2.50 the first time.
 
 STEP 4: Click "Chat with Marvis →"
 
-STEP 5: Type the flagship input in the text box at the bottom:
+--------------------------------------------------------------------------------
+  DEMO 1 — MARKETPLACE HIRE (Twitter, unchanged Phase 1 flow)
+--------------------------------------------------------------------------------
 
+Type:
   ┌─────────────────────────────────────────────────────────────────────┐
   │  Write a tweet about my Marvis launch and save it as a Twitter      │
   │  script in Google Docs.                                             │
   └─────────────────────────────────────────────────────────────────────┘
 
-  Press Enter or click "Send".
+  Marvis parses the task → finds TwitterPostSpecialist in the MARKETPLACE →
+  shows a HIRE CARD ($0.50 base + $1.00 completion, $1.50 total escrowed) →
+  PIN modal "🔐 Confirm Hire" → funds move to escrow → specialist writes the
+  tweet and calls create_doc → deterministic checks (≤280 chars, doc created) →
+  advisory Gemma score → PAYOUT CARD → PIN modal "🔐 Approve Payout" → escrow
+  releases to agent:TwitterPostSpecialist → receipt card, doc link included.
 
-STEP 6: Marvis parses your request (Gemma runs locally, takes ~10s).
-  You'll see:
-    Agent: "Task parsed:
-              type: doc_writing
-              inputs: { topic: 'Marvis launch', tone: 'casual', ... }
-              criteria: 3 checks"
+--------------------------------------------------------------------------------
+  DEMO 2 — SELF-EXTENDING BUILD (LinkedIn, Phase 2 flagship)
+--------------------------------------------------------------------------------
 
-STEP 7: Marvis discovers DocWriter (rule-based, no LLM on routing path).
-  You'll see:
-    Agent: "Found 1 specialist(s):
-              • Doc Writer (skill-doc-writer) — Writes content..."
-    Agent: "Selected: Doc Writer (DocWriter)
-              Base fee: $0.50   Completion fee: $1.00"
+Type (assuming app/owned-skills/ has been reset per above, or is fresh):
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  Write a LinkedIn post about my Marvis launch and save it as a      │
+  │  Google Doc.                                                        │
+  └─────────────────────────────────────────────────────────────────────┘
 
-STEP 8: A2UI HIRE CARD appears showing:
-  ┌─────────────────────────────────┐
-  │  Hire Confirmation              │
-  │  ──────────────────────────     │
-  │  Specialist:   DocWriter        │
-  │  Base fee:     $0.50 (now)      │
-  │  Completion:   $1.00 (delivery) │
-  │  Total held:   $1.50 in escrow  │
-  │  ──────────────────────────     │
-  │  Enter your PIN to authorise    │
-  └─────────────────────────────────┘
+  Marvis parses the task, then discovers there is NO skill for LinkedIn in
+  EITHER the marketplace or the owned library:
+    Agent: "Capability gap: no skill in the marketplace or owned library
+            covers linkedin (writer). Proposing a build."
 
-  A PIN MODAL pops up: "🔐 Confirm Hire"
-  → Enter your PIN (e.g. 1234) and click Confirm
+  A BUILD-APPROVAL CARD appears — NOT a normal hire card:
+  ┌───────────────────────────────────────────────────────┐
+  │  No Skill Yet — Commission One?                       │
+  │  No skill covers LinkedIn yet. Commission a            │
+  │  LinkedinWriter you'll OWN? After this, all LinkedIn   │
+  │  writer tasks run FREE forever.                        │
+  │  ────────────────────────────────────────────────      │
+  │  Build base fee:            $1.00   NON-REFUNDABLE    │
+  │  On delivery (valid build):  $1.50   ONE-TIME PURCHASE │
+  │  ────────────────────────────────────────────────      │
+  │  Total held in escrow:      $2.50                     │
+  │  Enter PIN to authorize the build                      │
+  └───────────────────────────────────────────────────────┘
 
-STEP 9: Marvis moves $1.50 from your wallet → escrow:task-xxxx
-  (Funds are LOCKED, not yet paid to agent)
-  You'll see:
-    Agent: "CartMandate verified."
-    Agent: "$1.50 moved to escrow:... | Booking ID: bkg-..."
+  PIN modal → enter your PIN → confirm. What happens next, all automatic:
+    1. $2.50 moves user → escrow:build-<task_id>
+    2. SkillBuilder (Gemma) writes a brand-new specialist's instruction text
+       — Marvis itself derives the skill_id, agent_name, allowed tool
+       (create_doc), specialties, and pricing; the model NEVER chooses those,
+       so it can never fabricate a nonexistent tool.
+    3. A deterministic validation gate checks the new skill for a fabricated
+       tool, a duplicate id, or a generic instruction — reject → refund
+       ($1.50 completion refunded, $1.00 base kept, nothing persisted).
+    4. On PASS: $2.50 releases to agent:SkillBuilder, escrow closes.
+    5. The new "LinkedinPostSpecialist" skill is written to
+       app/owned-skills/linkedin-writer/ and registered — permanently.
+    6. A live card appears: "✅ New Owned Skill — LinkedinPostSpecialist
+       added to your owned skill library."
+    7. Marvis immediately RE-RUNS your original request. It now finds the
+       skill in the OWNED store — NO further payment, NO PIN prompt. The
+       specialist writes the post and calls create_doc for free.
+    8. Receipt card shows the delivered LinkedIn post. Total paid this turn:
+       $2.50 (the one-time build) — the task itself was free.
 
-STEP 10: Marvis mints a CapabilityGrant for DocWriter:
-  → DocWriter can ONLY call create_doc (read tools blocked by allowlist)
-  You'll see:
-    Agent: "Capability grant minted: ... | Allowed: create_doc only"
+  Now type the SAME kind of request again in a new message:
+  ┌─────────────────────────────────────────────────────────────────────┐
+  │  Write another LinkedIn post about our product roadmap.             │
+  └─────────────────────────────────────────────────────────────────────┘
 
-STEP 11: DocWriter (Gemma) runs and writes your tweet (~15–30s):
-  You'll see a typing indicator (•••), then:
-    Agent: "Collected result from DocWriter:
-              Output: 🎉 Just launched Marvis — my AI orchestrator that hires...
-              Doc ID: 1BxKq3... (Google Doc created)"
-
-  NOTE: If Google OAuth hasn't been done yet, create_doc returns "created"
-  (mock) instead of a real doc ID. See GOOGLE DOCS SETUP below.
-
-STEP 12: Marvis verifies the work:
-    Deterministic checks:
-      ✓ tweet ≤ 280 chars
-      ✓ create_doc was called
-      ✓ doc_id is non-empty
-    Advisory Gemma score: 7/10 (example)
-
-STEP 13: A2UI PAYOUT CARD appears:
-  ┌─────────────────────────────────┐
-  │  Work Verification              │
-  │  ──────────────────────────     │
-  │  Specialist:   DocWriter        │
-  │  Advisory score: 7/10           │
-  │  Output preview:                │
-  │  🎉 Just launched Marvis — my   │
-  │  AI orchestrator that hires...  │
-  │  Doc saved: 1BxKq3...           │
-  │  ──────────────────────────     │
-  │  Completion fee: $1.00          │
-  │  Enter PIN to approve payout    │
-  └─────────────────────────────────┘
-
-  Another PIN MODAL: "🔐 Approve Payout"
-  → Enter your PIN again and click Confirm
-
-STEP 14: Marvis releases escrow → agent:DocWriter
-  You'll see:
-    Agent: "$1.50 released to agent:DocWriter | Journal: ..."
-    Agent: "Escrow settled: escrow:task-... == 0. HiringTxn closed."
-    Agent: (Receipt A2UI card)
-
-  ┌─────────────────────────────────┐
-  │  ✅ Task Complete               │
-  │  ──────────────────────────     │
-  │  Booking:  bkg-abc123           │
-  │  Agent:    DocWriter            │
-  │  Total paid: $1.50              │
-  │  Doc ID:   1BxKq3...            │
-  │  ──────────────────────────     │
-  │  Output:                        │
-  │  🎉 Just launched Marvis...     │
-  └─────────────────────────────────┘
+  This time: NO build card, NO PIN prompt at all. Marvis selects the owned
+  LinkedinPostSpecialist directly, writes and saves the post, and shows the
+  receipt — completely free. Wallet balance is unchanged.
 
 ================================================================================
   OPTION B — USE THE REST API (curl / Postman / Insomnia)
@@ -216,24 +208,16 @@ Response:
 --- STEP 4: Check balance ---
 curl "http://localhost:8000/wallet/balance?token=<YOUR_TOKEN>"
 
-Response:
-{
-  "balance_cents": 50000,
-  "transactions": [
-    { "delta_cents": 50000, "reason": "topup", "created_at": "..." }
-  ]
-}
-
 --- STEP 5: Create ADK session ---
 curl -X POST http://localhost:8000/adk-sessions \
   -H 'Content-Type: application/json' \
   -d '{"token":"<YOUR_TOKEN>"}'
 
 Response:
-{ "adk_session_id": "61bc9b5b64a740d488b225aca96e7e14" }
+{ "adk_session_id": "61bc9b5b64a740d488b225aca96e7e14", "user_id": "<YOUR_USER_ID>" }
 
 --- STEP 6: Send your task (SSE stream) ---
-curl -X POST http://localhost:8000/run_sse \
+curl -N -X POST http://localhost:8000/run_sse \
   -H 'Content-Type: application/json' \
   -d '{
     "app_name": "app",
@@ -242,139 +226,253 @@ curl -X POST http://localhost:8000/run_sse \
     "streaming": true,
     "new_message": {
       "role": "user",
-      "parts": [{"text": "Write a tweet about my Marvis launch and save it as a Twitter script in Google Docs."}]
+      "parts": [{"text": "Write a LinkedIn post about my Marvis launch and save it as a Google Doc."}]
     }
   }'
 
-(Stream will emit SSE events — use the React UI for the best experience)
+The stream emits one SSE "data: {...}" line per event. Watch content.parts[]:
+  - text containing <mstat>...</mstat>   → human-readable status line
+  - text containing <a2ui-json>...</a2ui-json> → a UI card (hire/build/payout/receipt)
+  - a functionCall named "adk_request_input" → a PIN gate has fired; its "id"
+    field is the interrupt_id you must use to resume (see next step)
 
---- STEP 7: When the PIN gate fires, verify PIN ---
-The SSE stream emits a functionCall event like:
-  { "functionCall": { "name": "adk_request_input", "id": "payment_auth", ... } }
+--- STEP 7: When a PIN gate fires, verify the PIN ---
+The functionCall looks like:
+  { "functionCall": { "name": "adk_request_input", "id": "build_auth", ... } }
 
-Then POST:
+interrupt_id is one of:
+  "payment_auth"  — PIN #1, hiring a MARKETPLACE skill (Phase 1, unchanged)
+  "build_auth"    — PIN #B, commissioning the SkillBuilder (Phase 2, new)
+  "payout_auth"   — PIN #2, releasing a market hire's completion fee
+                    (owned-skill runs have NO PIN #2 — nothing to release)
+
 curl -X POST http://localhost:8000/auth/verify-pin \
   -H 'Content-Type: application/json' \
   -d '{
     "token": "<YOUR_TOKEN>",
     "pin": "1234",
     "adk_session_id": "<SESSION_ID>",
-    "interrupt_id": "payment_auth"
+    "interrupt_id": "build_auth"
   }'
 
-Response:
-{ "ok": true }
+Response: { "ok": true }
 
-Then resume the stream by sending:
-  functionResponse: { id: "payment_auth", name: "adk_request_input", response: { result: "confirmed" } }
+--- STEP 8: Resume the stream ---
+curl -N -X POST http://localhost:8000/run_sse \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "app_name": "app",
+    "user_id": "<YOUR_USER_ID>",
+    "session_id": "<SESSION_ID>",
+    "streaming": true,
+    "new_message": {
+      "role": "user",
+      "parts": [{
+        "functionResponse": {
+          "id": "build_auth",
+          "name": "adk_request_input",
+          "response": {"result": "confirmed"}
+        }
+      }]
+    }
+  }'
 
---- STEP 8: Same for payout PIN (interrupt_id = "payout_auth") ---
+  (Use "response": {"result": "cancelled"} to reject instead — no PIN verify
+  call is needed for a cancel.)
+
+  Keep repeating STEP 7 → STEP 8 for every interrupt_id the stream emits,
+  in order, until the stream ends on a terminal card (receipt / refunded /
+  cancelled / output_failed).
 
 ================================================================================
   OTHER SAMPLE INPUTS TO TRY
 ================================================================================
 
-1. WRITE A TWEET (flagship):
+1. WRITE A TWEET (Phase 1 flagship, marketplace hire):
    "Write a tweet about my Marvis launch and save it as a Twitter script in Google Docs."
-   → Selects: DocWriter | Cost: $1.50 | Tool: create_doc
+   → Routes: market | Selects: TwitterPostSpecialist | Cost: $1.50 | Tool: create_doc
 
-2. WRITE A BLOG INTRO:
-   "Write a short blog post introduction about AI agents and save it as a Google Doc."
-   → Selects: DocWriter | Cost: $1.50 | Tool: create_doc
-
-3. WRITE SOCIAL MEDIA CONTENT:
+2. WRITE AN INSTAGRAM CAPTION (Phase 1, marketplace hire):
    "Write an Instagram caption for our new product launch and save it to Google Docs."
-   → Selects: DocWriter | Cost: $1.50 | Tool: create_doc
+   → Routes: market | Selects: InstaPostSpecialist | Cost: $1.50 | Tool: create_doc
 
-4. READ A DOCUMENT (requires an existing Google Doc ID):
-   "Summarise the document at doc ID 1BxKq3YourDocIdHere."
-   → Selects: DocReader | Cost: $0.75 | Tool: get_doc_content
+3. REVIEW A TWEET (requires an existing Google Doc ID):
+   "Review my tweet in this doc: 1BxKq3YourDocIdHere."
+   → Routes: market | Selects: TwitterPostReviewer | Cost: $0.75 | Tool: get_doc_content
 
-5. CANCELLATION FLOW (test refund path):
-   Start any task, then when the hire PIN modal appears → click Cancel
-   → Marvis routes to cancelled_terminal; NO escrow held; wallet untouched.
+4. WRITE A LINKEDIN POST — first time (Phase 2 flagship, capability gap):
+   "Write a LinkedIn post about my Marvis launch and save it as a Google Doc."
+   → Routes: gap → build ($2.50, one-time) → owned → free run
+   (Reset first with: rm -rf app/owned-skills/linkedin-writer && restart marvis)
 
-6. VERIFY FAIL (hard_fail path):
-   Internally triggered when DocWriter returns output > 280 chars or create_doc fails.
-   → Marvis refunds completion fee ($1.00), keeps base fee ($0.50), shows refund receipt.
+5. WRITE A LINKEDIN POST — after it's owned (Phase 2, free re-run):
+   "Write another LinkedIn post about our product roadmap."
+   → Routes: owned | Cost: $0.00 | NO PIN prompt at all
+
+6. CANCELLATION FLOW (test refund path):
+   Start any task; when a PIN modal appears (hire OR build), click Reject.
+   → Routes to cancelled_terminal; NO escrow held; wallet untouched.
+
+7. VERIFY FAIL, market hire (hard_fail path):
+   Internally triggered when a market specialist's output exceeds its
+   platform's char limit or create_doc fails.
+   → Marvis refunds the completion fee, keeps the base fee, shows a refund receipt.
+
+8. VERIFY FAIL, owned-skill run (output_failed path):
+   Same trigger, but on a FREE owned run.
+   → Nothing to refund (nothing was ever paid) — retry the same request at no cost.
+
+9. BUILD VALIDATION FAILURE (internal, not user-triggerable normally):
+   If the builder ever produced a fabricated tool or a duplicate skill id, the
+   deterministic validation gate rejects it before anything is persisted:
+   build completion fee ($1.50) refunded, build base fee ($1.00) kept,
+   nothing written to app/owned-skills/.
 
 ================================================================================
   WHAT EACH SPECIALIST CAN (AND CANNOT) DO
 ================================================================================
 
-  DocWriter (skill-doc-writer):
-    ✅ ALLOWED:   create_doc (Google Docs — create new document)
-    ❌ BLOCKED:   get_doc_content (no read access)
-    ❌ BLOCKED:   any other MCP tool
-    The CapabilityGrant is minted fresh per task, expires in 5 minutes,
-    and is revoked immediately after the specialist finishes.
+  Every specialist — marketplace OR owned — gets EXACTLY ONE MCP tool, chosen
+  from a closed set of two: create_doc (write) / get_doc_content (read).
+  A CapabilityGrant is minted fresh per task, expires in 5 minutes, and is
+  revoked immediately after the specialist finishes — whether the run
+  succeeded, failed, or (for the builder) never needed a tool at all.
 
-  DocReader (skill-doc-reader):
-    ✅ ALLOWED:   get_doc_content (Google Docs — read existing document)
-    ❌ BLOCKED:   create_doc (no write access)
-    ❌ BLOCKED:   any other MCP tool
+  TwitterPostSpecialist / InstaPostSpecialist / LinkedinPostSpecialist (owned):
+    ✅ ALLOWED:   create_doc
+    ❌ BLOCKED:   get_doc_content, any other MCP tool
 
-  This read-vs-write split is the least-privilege scoping demonstration.
+  TwitterPostReviewer / InstaPostReviewer:
+    ✅ ALLOWED:   get_doc_content
+    ❌ BLOCKED:   create_doc, any other MCP tool
+
+  SkillBuilder (marketplace, zero-capability):
+    ✅ ALLOWED:   nothing — it never touches an MCP tool. It only writes text
+                  (a new specialist's instruction). Dispatch skips the grant
+                  entirely for this skill — "nothing to lend" is the honest
+                  encoding of "generates behavior, never invents tools."
+    ❌ BLOCKED:   every MCP tool, always. A task that genuinely needs a NEW
+                  tool the builder doesn't have access to → build fails
+                  gracefully, nothing persisted. Marvis never invents tools.
+
+  This read-vs-write, closed-tool-set split is the least-privilege scoping
+  demonstration for BOTH the original marketplace and everything Marvis builds.
 
 ================================================================================
-  GOOGLE DOCS SETUP (one-time, optional for real doc creation)
+  GOOGLE DOCS SETUP (one-time, required for real doc creation)
 ================================================================================
 
-By default, create_doc returns a mock doc ID ("created") without real OAuth.
-To create actual Google Docs:
+By default, if OAuth hasn't been completed, create_doc will hang waiting for
+browser consent (a URL is printed to the marvis server log).
 
 1. Get a Google OAuth client:
    - Go to console.cloud.google.com → APIs & Services → Credentials
    - Create OAuth 2.0 Client ID (Desktop app)
-   - Download client_secret.json (NEVER commit this)
+   - Put the client id/secret in marvis/.env as GOOGLE_OAUTH_CLIENT_ID /
+     GOOGLE_OAUTH_CLIENT_SECRET (this file is gitignored)
 
-2. Place it at:
-   mcp-test/google_workspace_mcp/client_secret.json
+2. Set USER_GOOGLE_EMAIL in marvis/.env to the Google account you'll authorize.
 
-3. Run one-time consent (in the marvis/ directory):
-   uv run python ../mcp-test/google_workspace_mcp/create_doc.py
+3. First real create_doc call opens a consent URL (printed to the marvis
+   server log) — open it, sign in, grant Docs + Drive access. The token is
+   cached by the workspace-mcp server for subsequent calls.
 
-4. A browser tab opens → sign in with Google → grant Docs access
-   Token saved to: mcp-test/google_workspace_mcp/token.json  (gitignored)
-
-5. Restart ./run_marvis.sh — subsequent create_doc calls will create real Docs.
+4. If Ollama + the gdocs MCP round-trip is slow on your machine, raise the
+   dispatch timeout in marvis/.env:
+     DISPATCH_TIMEOUT_SECONDS=240
+   (default is 120s; a cold Gemma generation + a first MCP call can exceed it)
 
 ================================================================================
   FINANCIAL FLOW EXPLAINED
 ================================================================================
 
+  MARKETPLACE HIRE (e.g. Twitter, unchanged from Phase 1):
+
   User wallet:      $500.00 (after topup)
 
-  [HIRE — PIN gate #1]
+  [HIRE — PIN #1 "payment_auth"]
   User wallet:      $498.50  (-$1.50)
   escrow:task-xxx:  $1.50    (+$1.50)   ← locked during work
 
   [SPECIALIST RUNS]  (money stays in escrow)
 
-  [VERIFY PASS + PAYOUT — PIN gate #2]
+  [VERIFY PASS + PAYOUT — PIN #2 "payout_auth"]
   escrow:task-xxx:  $0.00    (-$1.50)   ← drained to zero
-  agent:DocWriter:  $1.50    (+$1.50)   ← specialist paid
+  agent:TwitterPostSpecialist: $1.50    (+$1.50)   ← specialist paid
 
   [VERIFY FAIL path (no payout PIN needed)]
   escrow:task-xxx:  $0.50    (base kept — non-refundable)
-  agent:DocWriter:  $0.50    (base fee only)
+  agent:TwitterPostSpecialist: $0.50    (base fee only)
   User wallet:      $499.50  (+$1.00 completion refunded)
 
-  Global ledger sum across ALL accounts: 0  (double-entry invariant)
+  ────────────────────────────────────────────────────────────────────────
+
+  SELF-EXTENDING BUILD (e.g. LinkedIn, Phase 2 — pay ONCE, own forever):
+
+  User wallet:      $500.00
+
+  [BUILD — PIN #B "build_auth"]
+  User wallet:      $497.50  (-$2.50)
+  escrow:build-xxx: $2.50    (+$2.50)   ← locked during the build
+
+  [SKILLBUILDER RUNS — writes instruction text only, no tool call]
+
+  [VALIDATION GATE PASSES → build completion released]
+  escrow:build-xxx: $0.00    (-$2.50)
+  agent:SkillBuilder: $2.50  (+$2.50)   ← builder paid, ONE TIME
+
+  [SKILL PERSISTED to app/owned-skills/linkedin-writer/ — permanent]
+
+  [ORIGINAL TASK RE-RUNS on the now-owned skill — NO payment nodes at all]
+  User wallet:      $497.50  (unchanged — the task itself is FREE)
+
+  [EVERY SUBSEQUENT LinkedIn task, forever]
+  User wallet:      unchanged — $0.00 every time, no PIN, no escrow
+
+  [BUILD VALIDATION FAILS instead — fabricated tool / duplicate id]
+  escrow:build-xxx: $1.00    (base kept — non-refundable)
+  agent:SkillBuilder: $1.00  (base fee only)
+  User wallet:      $498.50  (+$1.50 completion refunded)
+  Nothing written to app/owned-skills/ — try again from scratch.
+
+  Global ledger sum across ALL accounts: 0  (double-entry invariant, always)
   Every entry is hash-chained (SHA-256) — tamper-detectable.
+  Verify any time: curl "localhost:8000/wallet/verify-chain?token=<TOKEN>"
 
 ================================================================================
-  MILESTONE DONE-TESTS (all passing as of 2026-07-01)
+  MILESTONE DONE-TESTS (all passing as of 2026-07-02)
 ================================================================================
 
-  M0:  curl :8000/health && :8002/.well-known/agent-card && :8003/health  → all 200
-  M3:  Flagship input → AgentCard.agent_name == "DocWriter" (deterministic)
-  M5:  Gemma output ≤ 280 chars; mock create_doc called correctly
-  M6:  DocWriter grant cannot call get_doc_content (PermissionError raised)
+  PHASE 1
+  M0:  curl :8000/health && :8002/health && :8003/health  → all 200
+  M3:  Flagship tweet input → AgentCard.agent_name == "TwitterPostSpecialist"
+  M5:  Gemma output ≤ 280 chars; create_doc called correctly
+  M6:  TwitterPostSpecialist grant cannot call get_doc_content (PermissionError)
   M7:  revoke_by_task removes grant; expired grant returns "grant expired"
-  M8:  verify_work: happy path → checks_pass; long tweet → hard_fail; no doc → hard_fail
+  M8:  verify_work: happy path → checks_pass; long tweet / no doc → hard_fail
   M9:  hold→release→settle; sum==0; hash chain valid; refund path correct
-  M10: Full loop simulation (no HITL): intake→select→escrow→dispatch→verify→settle PASS
+  M10: Full loop (no HITL): intake→select→escrow→dispatch→verify→settle PASS
+
+  PHASE 2 (self-extending registry)
+  P2-M0: broker lists skill-builder, NO linkedin-* skills; owned library seeds clean
+  P2-M1: "Write a LinkedIn post…" → routes gap (not a mis-served Twitter writer);
+         "Write a tweet…" still routes market
+  P2-M2: Builder (given gap {linkedin, writer}) emits a SkillCard with
+         agent_name=="LinkedinPostSpecialist", tool_name=="create_doc"
+  P2-M3: Fabricated-tool card → reject; duplicate id → reject; valid card → accept
+  P2-M4: persist_skill writes app/owned-skills/linkedin-writer/ on disk,
+         registers it, broker catalog UNCHANGED, re-selection returns "owned"
+  P2-M5: Approving the build PIN moves $2.50 user→escrow→agent:SkillBuilder;
+         rejecting → cancelled_terminal, no money moves
+  P2-M6: FULL ARC verified live — gap → build ($2.50 charged, once) → persist →
+         re-select → owned run completes for FREE (real create_doc call,
+         advisory score 8/10) → immediate re-run by a DIFFERENT user skips the
+         builder entirely, $0 charged
+  P2-M7: Build-approval PIN card and "new owned skill" live card both confirmed
+         rendering during the real run
+  P2-M8: Restarted the marvis process mid-test — the owned LinkedinPostSpecialist
+         was still there (seed_owned_library() re-read it from disk) and still
+         absent from the broker catalog
 
 ================================================================================
   ARCHITECTURE AT A GLANCE
@@ -383,45 +481,67 @@ To create actual Google Docs:
   Browser / curl
        │
        ▼ HTTP :8000
-  ┌──────────────────────────────────────────────────┐
-  │  Marvis Agent  (ADK Workflow graph)              │
-  │                                                  │
-  │  intake_task ──→ discover ──→ select             │
-  │       ──→ [PIN#1] authorize_base_payment         │
-  │       ──→ create_hire_checkout (UCP CartMandate) │
-  │       ──→ verify_hire_cart                       │
-  │       ──→ pay_base_into_escrow (AP2 SD-JWT)      │
-  │       ──→ grant_capability (CapabilityGrant)     │
-  │       ──→ dispatch_to_specialist                 │
-  │              │                                   │
-  │              ▼  in-process                       │
-  │         ┌─────────────────────────────────┐      │
-  │         │  Specialist Runtime (Gemma)     │      │
-  │         │  wears SkillCard instruction    │      │
-  │         │  calls gdocs MCP via grant      │      │
-  │         └─────────────────────────────────┘      │
-  │       ──→ collect_result                         │
-  │       ──→ revoke_capability                      │
-  │       ──→ verify_work (det + advisory Gemma)     │
-  │       ──→ [PIN#2] approve_payout                 │
-  │       ──→ pay_completion                         │
-  │       ──→ settle_escrow                          │
-  │       ──→ receipt_terminal                       │
-  └──────────────────────────────────────────────────┘
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │  Marvis Agent  (ADK Workflow graph)                                    │
+  │                                                                        │
+  │  intake_task → discover_specialists → select_specialist                │
+  │       (queries BOTH the marketplace registry AND the owned registry)  │
+  │           │                    │                    │                 │
+  │       [market]              [owned]               [gap]               │
+  │           │                    │                    │                 │
+  │           ▼                    ▼                    ▼                 │
+  │   [PIN#1] authorize_    grant_capability      [PIN#B] propose_build    │
+  │   base_payment          (self-issued, FREE)   (commission SkillBuilder)│
+  │       → create_hire_        │                     │                   │
+  │         checkout            ▼                     ▼ (same hire loop)  │
+  │       → verify_hire_   dispatch_to_specialist  create_hire_checkout    │
+  │         cart                │                  → verify_hire_cart     │
+  │       → pay_base_into_      ▼                  → pay_base_into_escrow │
+  │         escrow          collect_result             │                  │
+  │           │                 │                       ▼                 │
+  │           ▼             revoke_capability     grant_capability(0 caps)│
+  │   grant_capability           │                      │                 │
+  │           │              verify_work                ▼                 │
+  │           ▼             (owned route: pass→        dispatch_to_       │
+  │   dispatch_to_           receipt_terminal,          specialist        │
+  │   specialist              fail→output_failed_       (builder writes   │
+  │           │                terminal, no refund)      instruction only)│
+  │           ▼                                          │                │
+  │      collect_result                                  ▼                │
+  │           │                                     validate_build        │
+  │           ▼                                    (deterministic gate)   │
+  │     revoke_capability                             │        │         │
+  │           │                                    invalid    valid       │
+  │           ▼                                       │          │        │
+  │      verify_work                            build_failed  pay_       │
+  │      ├─hard_fail→verify_failed→refunded          │         completion │
+  │      └─checks_pass→[PIN#2] approve_payout    refunded_    → settle_   │
+  │            → pay_completion → settle_escrow    terminal    escrow     │
+  │            → receipt_terminal                                │        │
+  │                                                                ▼       │
+  │                                                          persist_skill │
+  │                                                    (writes owned lib, │
+  │                                                     ↺ loops back to   │
+  │                                                     discover_specialists│
+  │                                                     for the ORIGINAL  │
+  │                                                     task — now "owned")│
+  └────────────────────────────────────────────────────────────────────────┘
        │
-       ▼ HTTP :8002
+       ▼ HTTP :8002 (marketplace hires only — the builder IS a market seller)
   ┌──────────────────┐      ▼ HTTP :8003
   │  Broker Server   │  ┌───────────────────┐
   │  GET /.well-known│  │  Scoped MCP Proxy │
-  │  /skills         │  │  (stub for M0-M11)│
-  │  /agent-card     │  └───────────────────┘
-  │  POST /mcp       │
+  │  /skills         │  │  (in-proc grant   │
+  │  /agent-card     │  │   enforcement)    │
+  │  POST /mcp       │  └───────────────────┘
   │  POST /mandates/ │
   │       /verify    │
   └──────────────────┘
+       (never sees app/owned-skills/ — that library is Marvis's own, private,
+        permanent, and free to run — the two stores are never conflated)
 
 ================================================================================
-  QUICK TEST WITHOUT THE UI (3 commands)
+  QUICK TEST WITHOUT THE UI (curl only)
 ================================================================================
 
 # 1. Register + topup
@@ -437,7 +557,14 @@ curl -s -X POST localhost:8000/wallet/topup \
 # 2. Check wallet balance
 curl -s "localhost:8000/wallet/balance?token=$TOKEN"
 
-# 3. Browse to http://localhost:5173, log in with q@q.com / q, and chat!
+# 3. Check the marketplace (should NOT include linkedin)
+curl -s localhost:8000/marketplace/agents | python3 -c "import sys,json;print([a['skill_id'] for a in json.load(sys.stdin)['agents']])"
+
+# 4. Check the owned library (empty on a clean checkout, or shows past builds)
+ls app/owned-skills/ 2>/dev/null || echo "(empty)"
+
+# 5. Browse to http://localhost:5173, log in with q@q.com / q, and chat!
+#    Try "Write a tweet…" (marketplace) then "Write a LinkedIn post…" (build).
 
 ================================================================================
   END OF TUTORIAL

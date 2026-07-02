@@ -148,7 +148,9 @@ async def receipt_terminal(node_input: dict[str, Any]) -> Any:
     booking_id: str = node_input.get("booking_id", "")
     skill_card: dict = node_input.get("skill_card", {})
     pricing: dict = skill_card.get("pricing", {})
-    total_cents: int = (
+    # Phase 2: an owned-skill run moves no money — nothing was actually paid.
+    is_owned: bool = node_input.get("skill_store") == "owned"
+    total_cents: int = 0 if is_owned else (
         pricing.get("base_fee_cents", 0) + pricing.get("completion_fee_cents", 0)
     )
     result: dict = node_input.get("specialist_result", {})
@@ -175,6 +177,27 @@ async def receipt_terminal(node_input: dict[str, Any]) -> Any:
             doc_id=doc_id,
             output_preview=output,
             task_id=task_id,
+        )),
+    )
+
+
+# ── output_failed_terminal (Phase 2: owned-skill run, nothing to refund) ───────
+
+def output_failed_terminal(node_input: dict[str, Any]) -> Any:
+    """Owned-skill run failed verification. The run was FREE — nothing to refund."""
+    verification: dict = node_input.get("verification", {})
+    issues = verification.get("issues", [])
+    issue_text = "\n".join(f"• {i}" for i in issues) if issues else "No details available."
+
+    save_job_receipt(node_input, "output_failed")
+
+    return Event(
+        output={"status": "output_failed"},
+        content=_a2ui(_build_status_a2ui(
+            "output-failed", "Output Failed Verification",
+            issue_text + "\n\nThis was a FREE run on your owned skill — nothing to refund. "
+            "You can retry at no cost.",
+            color="var(--red)",
         )),
     )
 

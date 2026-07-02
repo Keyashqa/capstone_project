@@ -9,6 +9,11 @@ Deterministic checks for the flagship doc_writing task:
   Advisory: Gemma re-reads goal_nl + acceptance_criteria + output → {score, reasons}.
 
 Routes: "hard_fail" → verify_failed, "checks_pass" → approve_payout (PIN gate #2).
+
+Phase 2 (plan2.md §P2-5.0): the OWNED-skill run reuses this node verbatim for its
+checks, but there is no payment to release or refund — `skill_store` (set by
+select_specialist) picks the route: "owned_checks_pass"/"owned_hard_fail" skip
+straight to receipt_terminal / output_failed_terminal (no PIN #2, no escrow).
 """
 from __future__ import annotations
 
@@ -109,6 +114,7 @@ async def verify_work(node_input: dict[str, Any]) -> Any:
     spec: dict = node_input.get("spec", {})
     result: dict = node_input.get("specialist_result", {})
     goal_nl: str = node_input.get("goal_nl", "")
+    is_owned: bool = node_input.get("skill_store") == "owned"
 
     # Step 1: Deterministic pre-filter (hard gate)
     checks_pass, issues = _deterministic_checks(spec, result)
@@ -117,7 +123,7 @@ async def verify_work(node_input: dict[str, Any]) -> Any:
         issue_lines = "\n".join(f"  • {i}" for i in issues)
         return Event(
             output={**node_input, "verification": {"passed": False, "issues": issues}},
-            route="hard_fail",
+            route="owned_hard_fail" if is_owned else "hard_fail",
             content=_content(
                 f"Verification FAILED (deterministic checks):\n{issue_lines}"
             ),
@@ -140,13 +146,18 @@ async def verify_work(node_input: dict[str, Any]) -> Any:
     }
 
     reason_lines = "\n".join(f"  {i+1}. {r}" for i, r in enumerate(reasons))
+    trailer = (
+        "This was a FREE owned-skill run — nothing to release."
+        if is_owned
+        else "Awaiting your PIN to release the completion payment."
+    )
     return Event(
         output={**node_input, "verification": verification},
-        route="checks_pass",
+        route="owned_checks_pass" if is_owned else "checks_pass",
         content=_content(
             f"Deterministic checks: PASSED\n"
             f"Advisory score: {score}/10\n"
             f"Reasons:\n{reason_lines}\n\n"
-            f"Awaiting your PIN to release the completion payment."
+            f"{trailer}"
         ),
     )

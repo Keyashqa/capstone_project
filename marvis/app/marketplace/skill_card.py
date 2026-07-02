@@ -28,6 +28,10 @@ class SkillIo(BaseModel):
 
 class SkillCard(BaseModel):
     skill_id: str           # "skill-doc-writer"
+    owner_id: str = "marvis"        # owner principal — namespaces folder, registry key, keystore.
+                            # Defaults to "marvis" so all Phase 1/2 seeded skills are single-owner.
+    owner_account: str | None = None  # ledger account earnings route to once LISTED (Phase 3).
+                            # None ⇒ unowned ⇒ broker keeps 100%. Not wired into payout yet.
     agent_name: str         # DETERMINISTIC — declared by the skill, never LLM-invented (A10)
                             # e.g. "DocWriter" / "DocReader"
     display_name: str
@@ -48,6 +52,7 @@ class AgentCard(BaseModel):
     agent_id: str           # == skill_id (1:1 in Phase 1)
     agent_name: str         # == SkillCard.agent_name (deterministic; drives ledger agent:{name})
     skill_id: str
+    owner_account: str | None = None  # copied from SkillCard; where the 90% will route (Phase 3)
     specialties: list[str]
     required_capabilities: list[CapabilityRef]
     pricing: SkillPricing
@@ -60,6 +65,7 @@ class AgentCard(BaseModel):
             agent_id=card.skill_id,
             agent_name=card.agent_name,
             skill_id=card.skill_id,
+            owner_account=card.owner_account,
             specialties=card.specialties,
             required_capabilities=card.required_capabilities,
             pricing=card.pricing,

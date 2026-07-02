@@ -4,6 +4,13 @@ M6: Mint a CapabilityGrant with exactly ONE allowed tool (from the chosen SkillC
     required_capabilities). Register it in InMemoryGrantRegistry.
 M7: revoke_capability runs on EVERY exit path from dispatch (success + failure).
     Grant additionally self-expires by TTL — dual safety mechanism.
+
+Phase 2 (plan2.md §P2-5b): a skill with zero required_capabilities (the builder —
+it generates text, never calls an MCP tool) is legitimate, not an error. It still
+routes "granted" (the ADK graph forbids two labeled edges into the same target),
+but no grant is minted — dispatch_to_specialist checks required_capabilities
+itself and runs the builder without a grant_token. "grant_failed" is reserved
+for a skill that DECLARES capabilities but mis-declares them.
 """
 from __future__ import annotations
 
@@ -29,10 +36,14 @@ async def grant_capability(node_input: dict[str, Any]) -> Any:
 
     required_caps: list[dict] = skill_card.get("required_capabilities", [])
     if not required_caps:
+        # Zero-capability skill (e.g. the builder) — nothing to lend, not an error.
+        # Routes "granted" too (the ADK graph disallows two labeled edges into the
+        # same target node); dispatch_to_specialist itself decides whether a grant
+        # token is required by checking skill_card.required_capabilities.
         return Event(
             output=node_input,
-            route="grant_failed",
-            content=_content("No required_capabilities declared in SkillCard."),
+            route="granted",
+            content=_content(f"{agent_name} declares no required_capabilities — dispatching without a grant."),
         )
 
     # Phase 1: exactly ONE capability entry
@@ -91,12 +102,20 @@ async def grant_capability(node_input: dict[str, Any]) -> Any:
 
 
 async def revoke_capability(node_input: dict[str, Any]) -> Any:
-    """Revoke all active grants for this task. Runs on EVERY exit from dispatch."""
+    """Revoke all active grants for this task. Runs on EVERY exit from dispatch.
+
+    Phase 2: for the builder dispatch (0 capabilities, no grant minted) this is
+    a no-op (revokes 0 grants) — safe and consistent. Routes "post_build" vs
+    "post_work" since the builder's deliverable is a SkillCard, not task output
+    to verify.
+    """
     task_id: str = node_input.get("task_id", "")
     count = get_grant_registry().revoke_by_task(task_id)
+    is_builder = node_input.get("selected_skill_id") == "skill-builder"
 
     return Event(
         output=node_input,
+        route="post_build" if is_builder else "post_work",
         content=_content(
             f"Capability revoked for task {task_id} ({count} grant(s) revoked). "
             f"Access to specialist closed."

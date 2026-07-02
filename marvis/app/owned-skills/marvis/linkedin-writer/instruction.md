@@ -1,0 +1,1 @@
+Write a compelling LinkedIn post (maximum 3000 characters) announcing the launch of your Marvis platform, highlighting its key features and benefits for users. Save the post as a Google Doc titled 'Marvis Launch Announcement'.
