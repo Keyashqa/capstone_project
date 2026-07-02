@@ -65,9 +65,11 @@ from app.workflow.nodes.verify import verify_work
 # ── Seed the skill catalog on startup ─────────────────────────────────────────
 # (imported here so the registries are populated before any request arrives)
 from app.marketplace.seed import seed_catalog, seed_owned_library  # noqa: F401, E402
+from app.seed_demo import seed_demo  # noqa: E402
 
 seed_catalog()
 seed_owned_library()  # Phase 2: Marvis's owned-skills library (survives restart)
+seed_demo()           # Phase 3: real seller "alice" + funded buyer + alice's listing
 
 # ── Marvis Workflow graph ──────────────────────────────────────────────────────
 

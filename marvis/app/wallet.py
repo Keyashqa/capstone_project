@@ -254,7 +254,12 @@ def get_platform_stats(feed_limit: int = 50) -> dict:
         # a Phase 2 skill-builder commission both flow through the same node, so this
         # is the total volume ever committed to a hire, platform-wide.
         total_volume_cents = _sum("reason = 'hire_escrow' AND delta_cents > 0")
-        total_paid_to_agents_cents = _sum("account_id LIKE 'agent:%' AND delta_cents > 0")
+        # Phase 3: agent:owner:<id> earnings share the 'agent:%' prefix but are
+        # OWNER earnings, not specialist earnings — exclude them so the specialist
+        # aggregate isn't double-counted the moment an owner is paid (plan3.md §P3-8).
+        total_paid_to_agents_cents = _sum(
+            "account_id LIKE 'agent:%' AND account_id NOT LIKE 'agent:owner:%' AND delta_cents > 0"
+        )
         total_refunded_cents = _sum(
             "reason IN ('completion_refund', 'build_completion_refund') AND delta_cents > 0"
         )
@@ -264,10 +269,30 @@ def get_platform_stats(feed_limit: int = 50) -> dict:
             "SELECT COUNT(DISTINCT journal_id) AS n FROM ledger WHERE reason = 'hire_escrow'"
         ).fetchone()["n"]
 
+        # ── Phase 3 revenue reads (plan3.md §P3-8) ────────────────────────────
+        # Broker pool: commission on listed hires (reason=payout_owner's counterpart)
+        # PLUS the full payout of unowned skills. All land in the single 'broker'
+        # account, so total broker revenue is one SUM; commission-only filters on
+        # the reason the split writes.
+        broker_revenue_cents = _sum("account_id = 'broker' AND delta_cents > 0")
+        commission_cents = _sum(
+            "account_id = 'broker' AND reason = 'payout_commission' AND delta_cents > 0"
+        )
+        # Per-owner earnings (base + 90% completion of every LISTED hire), the
+        # agent:owner:<id> rows the split writes — kept separate from specialists.
+        per_owner_rows = conn.execute(
+            """SELECT account_id, SUM(delta_cents) AS earned
+                 FROM ledger
+                WHERE account_id LIKE 'agent:owner:%' AND delta_cents > 0
+                GROUP BY account_id
+                ORDER BY earned DESC"""
+        ).fetchall()
+
         per_agent_rows = conn.execute(
             """SELECT account_id, SUM(delta_cents) AS earned
                  FROM ledger
-                WHERE account_id LIKE 'agent:%' AND delta_cents > 0
+                WHERE account_id LIKE 'agent:%' AND account_id NOT LIKE 'agent:owner:%'
+                      AND delta_cents > 0
                 GROUP BY account_id
                 ORDER BY earned DESC"""
         ).fetchall()
@@ -288,9 +313,15 @@ def get_platform_stats(feed_limit: int = 50) -> dict:
             "total_refunded_cents": total_refunded_cents,
             "total_topped_up_cents": total_topped_up_cents,
             "hire_count": hire_count,
+            "broker_revenue_cents": broker_revenue_cents,
+            "commission_cents": commission_cents,
             "per_agent": [
                 {"agent_name": r["account_id"].removeprefix("agent:"), "earned_cents": r["earned"]}
                 for r in per_agent_rows
+            ],
+            "per_owner": [
+                {"owner_id": r["account_id"].removeprefix("agent:owner:"), "earned_cents": r["earned"]}
+                for r in per_owner_rows
             ],
             "feed": [dict(r) for r in feed_rows],
         }

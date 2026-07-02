@@ -214,18 +214,43 @@ async def authorize_base_payment(ctx: Context, node_input: dict[str, Any]):
 
 # ── create_hire_checkout ───────────────────────────────────────────────────────
 
+def _local_checkout(node_input: dict[str, Any], task_id: str) -> dict[str, Any]:
+    """Build a checkout from the pricing Marvis already holds, without the broker.
+
+    The broker's catalog only knows skills present at ITS startup, so skills a user
+    UPLOADS or LISTS at runtime (Phase 3) aren't in it. For those, Marvis is the
+    authority on pricing (it's on the selected skill_card), so we construct the
+    checkout locally. Downstream is unaffected: verify_hire_cart passes on an empty
+    cart_mandate, and pay_base_into_escrow already tolerates a skipped broker verify.
+    """
+    pricing = node_input.get("skill_card", {}).get("pricing", {})
+    total = pricing.get("base_fee_cents", 0) + pricing.get("completion_fee_cents", 0)
+    return {"cart_mandate": {}, "session_id": task_id, "total_cents": total, "local": True}
+
+
 async def create_hire_checkout(node_input: dict[str, Any]) -> Any:
-    """Call broker /mcp create_checkout — broker signs and returns hiring CartMandate."""
+    """Call broker /mcp create_checkout — broker signs and returns hiring CartMandate.
+
+    Falls back to a LOCAL checkout when the broker doesn't know the skill (e.g. a
+    runtime-uploaded custom skill or a Phase 3 listing the broker was never told
+    about), so any hireable skill can be checked out without a broker catalog sync.
+    """
     agent_card = node_input.get("agent_card", {})
     skill_id = agent_card.get("skill_id", "")
     task_id = node_input.get("task_id", uuid.uuid4().hex[:12])
 
     client = get_broker_client()
-    rsp = await client.mcp_call(
-        "create_checkout",
-        {"skill_id": skill_id, "task_id": task_id},
-    )
-    checkout = rsp.get("result", rsp)
+    try:
+        rsp = await client.mcp_call(
+            "create_checkout",
+            {"skill_id": skill_id, "task_id": task_id},
+        )
+        checkout = rsp.get("result", rsp)
+        note = f"Checkout created: session {checkout.get('session_id', '?')}"
+    except Exception as exc:
+        # Broker doesn't know this skill (uploaded/listed at runtime) — check out locally.
+        checkout = _local_checkout(node_input, task_id)
+        note = f"Broker has no listing for {skill_id}; created a local checkout (${checkout['total_cents']/100:.2f})."
 
     return Event(
         output={
@@ -235,7 +260,7 @@ async def create_hire_checkout(node_input: dict[str, Any]) -> Any:
             "session_id": checkout.get("session_id", task_id),
             "total_cents": checkout.get("total_cents", 0),
         },
-        content=_content(f"Checkout created: session {checkout.get('session_id', '?')}"),
+        content=_content(note),
     )
 
 

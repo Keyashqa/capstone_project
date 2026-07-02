@@ -45,7 +45,16 @@ def _server_params() -> StdioServerParameters:
         "MCP_SINGLE_USER_MODE": MCP_SINGLE_USER_MODE,
         "USER_GOOGLE_EMAIL": USER_GOOGLE_EMAIL,
         "PATH": os.environ.get("PATH", ""),
+        "PYTHONIOENCODING": "utf-8",
     }
+    # On Windows, os.path.expanduser("~") inside the subprocess needs USERPROFILE
+    # (and other Windows env vars) to find the OAuth credential cache.
+    # Without them the credential store falls back to a cwd-relative path that
+    # has no token, causing the MCP call to fail silently.
+    for win_var in ("USERPROFILE", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP", "SystemRoot", "HOMEDRIVE", "HOMEPATH"):
+        val = os.environ.get(win_var)
+        if val:
+            env[win_var] = val
     return StdioServerParameters(
         command="uv",
         args=["run", "workspace-mcp", "--transport", "stdio"],

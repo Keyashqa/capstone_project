@@ -1,0 +1,30 @@
+{
+  "skill_id": "skill-medium-post-writer",
+  "owner_id": "28d9932f648842e1",
+  "owner_account": "agent:owner:28d9932f648842e1",
+  "agent_name": "MediumPostWriter",
+  "display_name": "Medium Post Writer",
+  "version": "1.0.0",
+  "description": "Writes engaging Twitter/X posts and saves them to Google Docs. For creating tweets and short-form social posts for Twitter.",
+  "specialties": [
+    "medium",
+    "writer"
+  ],
+  "model": "ollama/gemma2:2b",
+  "match_keywords": [
+    "medium",
+    "writer"
+  ],
+  "required_capabilities": [
+    {
+      "mcp_server": "gdocs",
+      "tool_name": "create_doc",
+      "why": "save the produced document"
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 50,
+    "completion_fee_cents": 100
+  }
+}

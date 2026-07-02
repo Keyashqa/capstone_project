@@ -19,7 +19,8 @@ from google.adk.events.request_input import RequestInput
 from google.adk.workflow import node
 from google.genai import types as genai_types
 
-from app.escrow.operations import get_escrow_balance, release_to_agent
+from app.escrow.operations import get_escrow_balance, release_from_escrow
+from app.escrow.split import compute_split
 
 CATALOG_ID = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
 
@@ -194,20 +195,38 @@ async def approve_payout(ctx: Context, node_input: dict[str, Any]):
 # ── pay_completion ─────────────────────────────────────────────────────────────
 
 async def pay_completion(node_input: dict[str, Any]) -> Any:
-    """Release escrow:{task_id} → agent:{agent_name} (full amount: base + completion)."""
+    """Release escrow:{task_id} to the owner + broker via the Phase 3 split.
+
+    LISTED skill (owner_account set): base 100% + completion 90% → agent:owner:<id>,
+      completion 10% → broker (floor commission on completion, derive owner by
+      subtraction — penny-exact, escrow drains to 0).
+    UNOWNED skill (owner_account None): 100% (base + completion) → broker.
+    (plan3.md §P3-4; decisions Q1/Q3. The old flat agent:<agent_name> payout is
+    gone for listed/unowned skills.)
+    """
     task_id: str = node_input.get("task_id", "")
     skill_card: dict = node_input.get("skill_card", {})
     agent_name: str = skill_card.get("agent_name", "Agent")
+    owner_account: str | None = skill_card.get("owner_account")
     pricing: dict = skill_card.get("pricing", {})
     base_cents: int = pricing.get("base_fee_cents", 0)
     completion_cents: int = pricing.get("completion_fee_cents", 0)
     total_cents: int = base_cents + completion_cents
 
-    journal_id = await release_to_agent(
-        task_id=task_id,
-        agent_name=agent_name,
-        amount_cents=total_cents,
-        reason="payout",
+    legs = compute_split(base_cents, completion_cents, owner_account)  # Σ legs == total_cents
+    journal_ids: list[str] = []
+    for to_account, amount_cents, reason in legs:
+        journal_ids.append(
+            await release_from_escrow(
+                task_id=task_id,
+                to_account=to_account,
+                amount_cents=amount_cents,
+                reason=reason,
+            )
+        )
+    journal_id = journal_ids[-1] if journal_ids else None
+    split_summary = "\n".join(
+        f"  ${amt / 100:.2f} → {acct}  ({reason})" for acct, amt, reason in legs
     )
 
     # Update hiring txn
@@ -229,10 +248,9 @@ async def pay_completion(node_input: dict[str, Any]) -> Any:
         pass
 
     return Event(
-        output={**node_input, "completion_journal_id": journal_id},
+        output={**node_input, "completion_journal_id": journal_id, "payout_legs": legs},
         content=_content(
-            f"${total_cents / 100:.2f} released to agent:{agent_name}\n"
-            f"Journal: {journal_id}"
+            f"${total_cents / 100:.2f} released from escrow:{task_id}\n{split_summary}"
         ),
     )
 

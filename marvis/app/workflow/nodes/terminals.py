@@ -246,11 +246,21 @@ def hire_invalid_terminal(node_input: dict[str, Any]) -> Any:
 # ── verify_failed (+ refund path) ─────────────────────────────────────────────
 
 async def verify_failed(node_input: dict[str, Any]) -> Any:
-    """Refund the completion fee to user; base is non-refundable."""
+    """Refund completion → buyer; sweep the non-refundable base → owner/broker.
+
+    Phase 3 (decision Q3): base is the owner's non-refundable hiring fee, so on
+    failure it sweeps 100% → agent:owner:<id> (LISTED) or → broker (UNOWNED),
+    and the completion refunds to the buyer. The base sweep is the EXPLICIT leg
+    that drains base out of escrow so escrow still settles to 0 on the fail path
+    (previously base was stranded — audit §2). The broker takes no commission on
+    failed work.
+    """
     task_id: str = node_input.get("task_id", "")
     user_id: str = node_input.get("user_id", "")
     skill_card: dict = node_input.get("skill_card", {})
+    owner_account: str | None = skill_card.get("owner_account")
     pricing: dict = skill_card.get("pricing", {})
+    base_cents: int = pricing.get("base_fee_cents", 0)
     completion_cents: int = pricing.get("completion_fee_cents", 0)
     verification: dict = node_input.get("verification", {})
     issues = verification.get("issues", [])
@@ -267,6 +277,23 @@ async def verify_failed(node_input: dict[str, Any]) -> Any:
             )
         except Exception as exc:
             issues.append(f"refund failed: {exc}")
+
+    # Explicit base sweep (Q3): drain the non-refundable base out of escrow.
+    if task_id and base_cents > 0:
+        try:
+            from app.escrow.operations import release_from_escrow
+            from app.escrow.split import base_sweep_leg
+            leg = base_sweep_leg(base_cents, owner_account)
+            if leg is not None:
+                to_account, amount_cents, reason = leg
+                await release_from_escrow(
+                    task_id=task_id,
+                    to_account=to_account,
+                    amount_cents=amount_cents,
+                    reason=reason,
+                )
+        except Exception as exc:
+            issues.append(f"base sweep failed: {exc}")
 
     issue_text = "\n".join(f"• {i}" for i in issues) if issues else "No details available."
     refund_note = (

@@ -9,6 +9,7 @@ export default defineConfig({
       '/auth':        { target: 'http://localhost:8000', changeOrigin: true },
       '/wallet':      { target: 'http://localhost:8000', changeOrigin: true },
       '/marketplace': { target: 'http://localhost:8000', changeOrigin: true },
+      '/skills':      { target: 'http://localhost:8000', changeOrigin: true },
       '/owned-skills':{ target: 'http://localhost:8000', changeOrigin: true },
       '/platform':    { target: 'http://localhost:8000', changeOrigin: true },
       '/adk-sessions':{ target: 'http://localhost:8000', changeOrigin: true },

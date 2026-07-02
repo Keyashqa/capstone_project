@@ -1,4 +1,4 @@
-type NavPage = 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform'
+type NavPage = 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell'
 
 interface Props {
   active: NavPage
@@ -75,6 +75,15 @@ function PlatformIcon() {
   )
 }
 
+function SellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
 export default function Sidebar({ active, email, balanceCents, onNavigate, onLogout }: Props) {
   const initial = (email || '?').trim().charAt(0).toUpperCase()
 
@@ -106,6 +115,13 @@ export default function Sidebar({ active, email, balanceCents, onNavigate, onLog
         >
           <OwnedSkillsIcon />
           <span className="side-label">Owned Skills</span>
+        </button>
+        <button
+          className={`side-item${active === 'sell' ? ' side-item-active' : ''}`}
+          onClick={() => onNavigate('sell')}
+        >
+          <SellIcon />
+          <span className="side-label">Sell a Skill</span>
         </button>
         <button
           className={`side-item${active === 'platform' ? ' side-item-active' : ''}`}

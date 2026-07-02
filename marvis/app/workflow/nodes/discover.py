@@ -20,7 +20,7 @@ from google.adk.events.event import Event
 from google.genai import types as genai_types
 
 from app.marketplace.skill_card import AgentCard, SkillCard
-from app.marketplace.skill_registry import get_owned_registry, get_registry
+from app.marketplace.skill_registry import DEFAULT_OWNER_ID, get_owned_registry, get_registry
 
 
 def _content(text: str) -> genai_types.Content:
@@ -50,9 +50,17 @@ async def discover_specialists(node_input: dict[str, Any]) -> Any:
     spec: dict = node_input.get("spec", {})
     task_type: str = spec.get("type", "")
     inputs = spec.get("inputs", {})
+    goal_nl: str = node_input.get("goal_nl", "")
 
-    market_candidates = get_registry().find_for_task(task_type, inputs)
-    owned_candidates = get_owned_registry().find_for_task(task_type, inputs)
+    market_registry = get_registry()
+    # Platform candidates (specialty match) ∪ Phase 3 CUSTOM candidates (keyword match
+    # on the raw goal). Dedupe by (owner_id, skill_id) so a card matched both ways
+    # appears once.
+    market_candidates = _dedupe(
+        market_registry.find_for_task(task_type, inputs)
+        + market_registry.find_custom_matches(goal_nl)
+    )
+    owned_candidates = _dedupe(get_owned_registry().find_for_task(task_type, inputs))
 
     if not market_candidates and not owned_candidates:
         return Event(
@@ -65,11 +73,15 @@ async def discover_specialists(node_input: dict[str, Any]) -> Any:
     cards_summary = "\n".join(
         f"  • {c.display_name} ({c.skill_id}) — {c.description}" for c in all_candidates
     )
+    # Phase 3: carry (owner_id, skill_id) — the registry is composite-keyed, so a
+    # non-"marvis" seller's listing (e.g. alice's) must be resolved WITH its owner
+    # in select_specialist, else registry.get defaults to "marvis" and KeyErrors
+    # (audit §A-4).
     return Event(
         output={
             **node_input,
-            "candidate_skill_ids": [c.skill_id for c in market_candidates],
-            "owned_candidate_skill_ids": [c.skill_id for c in owned_candidates],
+            "candidate_skill_ids": [[c.owner_id, c.skill_id] for c in market_candidates],
+            "owned_candidate_skill_ids": [[c.owner_id, c.skill_id] for c in owned_candidates],
         },
         route="found",
         content=_content(f"Found {len(all_candidates)} specialist(s):\n{cards_summary}"),
@@ -91,36 +103,79 @@ def _score(card: SkillCard, channel_key: str, review: bool) -> int:
     return score
 
 
+def _rank_key(card: SkillCard, channel_key: str, review: bool) -> tuple[int, int]:
+    """Ranking key: score first, then prefer a real seller LISTING (owner_account
+    set) over the platform's unowned stub on a tie (plan3.md §P3-6a). This lets
+    alice's listed twitter-writer win the hire over Marvis's unowned twitter-writer
+    so the earnings actually flow to the seller. Owned skills (no market
+    competitor for their platform in the demo) are unaffected."""
+    return (_score(card, channel_key, review), 1 if card.owner_account else 0)
+
+
+def _ref(entry) -> tuple[str, str]:
+    """Unpack a candidate ref [owner_id, skill_id] (Phase 3) or a bare skill_id
+    (back-compat / pre-Phase-3 session state) → (skill_id, owner_id)."""
+    if isinstance(entry, (list, tuple)):
+        owner_id, skill_id = entry
+        return skill_id, owner_id
+    return entry, DEFAULT_OWNER_ID
+
+
+def _dedupe(cards: list[SkillCard]) -> list[SkillCard]:
+    """Dedupe cards by (owner_id, skill_id), preserving order."""
+    seen: set[tuple[str, str]] = set()
+    out: list[SkillCard] = []
+    for c in cards:
+        key = (c.owner_id, c.skill_id)
+        if key not in seen:
+            seen.add(key)
+            out.append(c)
+    return out
+
+
+def _custom_score(card: SkillCard, goal_nl: str) -> int:
+    """# of the card's match_keywords that appear (substring) in the task text."""
+    g = goal_nl.lower()
+    return sum(1 for kw in card.match_keywords if kw.lower() in g)
+
+
+def _select_output(node_input: dict, chosen: SkillCard, store: str) -> Event:
+    """Build the select_specialist success Event for a chosen card."""
+    agent_card = AgentCard.from_skill_card(chosen)
+    kind = "custom" if chosen.match_keywords else "platform"
+    return Event(
+        route=store,  # "market" (rent / listed-earns) or "owned" (free, self-issued)
+        output={
+            **node_input,
+            "selected_skill_id": chosen.skill_id,
+            "selected_owner_id": chosen.owner_id,
+            "skill_store": store,
+            "agent_card": agent_card.model_dump(),
+            "skill_card": chosen.model_dump(),
+        },
+        content=_content(
+            f"Selected: {chosen.display_name} ({chosen.agent_name}) [{store}/{kind}]\n"
+            f"  Base fee: ${chosen.pricing.base_fee_cents / 100:.2f}  "
+            f"Completion fee: ${chosen.pricing.completion_fee_cents / 100:.2f}"
+        ),
+    )
+
+
 async def select_specialist(node_input: dict[str, Any]) -> Any:
     """Pick the best SkillCard across BOTH stores; route market / owned / gap."""
     spec: dict = node_input.get("spec", {})
     task_type: str = spec.get("type", "")
-    market_ids: list[str] = node_input.get("candidate_skill_ids", [])
-    owned_ids: list[str] = node_input.get("owned_candidate_skill_ids", [])
+    market_refs = node_input.get("candidate_skill_ids", [])
+    owned_refs = node_input.get("owned_candidate_skill_ids", [])
 
     market_registry = get_registry()
     owned_registry = get_owned_registry()
-
-    # Route by platform (channel) + role (write vs review). Each candidate skill_id
-    # encodes both, e.g. "skill-twitter-writer" / "skill-linkedin-reviewer".
-    channel_key = _channel_key(str(spec.get("inputs", {}).get("channel", "")))
-    review = _is_review(task_type, node_input.get("goal_nl", ""))
-
-    if not channel_key:
-        # Closed platform set (twitter/instagram/linkedin) — intake already
-        # resolves it; an unresolved channel here is a routing dead-end, not a
-        # gap the builder can fill.
-        return Event(
-            output=node_input,
-            route="none",
-            content=_content("Could not resolve a target platform for this task."),
-        )
+    goal_nl: str = node_input.get("goal_nl", "")
 
     candidates: list[tuple[SkillCard, str]] = (
-        [(market_registry.get(cid), "market") for cid in market_ids]
-        + [(owned_registry.get(cid), "owned") for cid in owned_ids]
+        [(market_registry.get(sid, oid), "market") for sid, oid in map(_ref, market_refs)]
+        + [(owned_registry.get(sid, oid), "owned") for sid, oid in map(_ref, owned_refs)]
     )
-
     if not candidates:
         return Event(
             output=node_input,
@@ -128,7 +183,47 @@ async def select_specialist(node_input: dict[str, Any]) -> Any:
             content=_content("Could not select a specialist."),
         )
 
-    chosen, store = max(candidates, key=lambda pair: _score(pair[0], channel_key, review))
+    # ── Phase 3: CUSTOM (user-uploaded) skills, matched by free-form keyword ──────
+    # A custom skill wins when it matches the task text AND its match is at least as
+    # strong as the platform router's (custom_score*2 > platform_score). Platform
+    # skills carry no match_keywords, so they never accidentally win a keyword
+    # contest — the flagship "write a tweet" (custom_score 0) still routes to the
+    # twitter skill, while "draft a cold outreach email" routes to a listed Email
+    # Writer that the platform router (score ~0) can't serve.
+    custom = [(c, s) for c, s in candidates if c.match_keywords]
+    platform = [(c, s) for c, s in candidates if not c.match_keywords]
+
+    # Route by platform (channel) + role (write vs review). Each platform skill_id
+    # encodes both, e.g. "skill-twitter-writer" / "skill-linkedin-reviewer".
+    channel_key = _channel_key(str(spec.get("inputs", {}).get("channel", "")))
+    review = _is_review(task_type, goal_nl)
+
+    platform_best, platform_score = None, -1
+    if platform:
+        platform_best, platform_store = max(platform, key=lambda p: _rank_key(p[0], channel_key, review))
+        platform_score = _score(platform_best, channel_key, review)
+
+    if custom:
+        custom_best, custom_store = max(custom, key=lambda p: _custom_score(p[0], goal_nl))
+        custom_score = _custom_score(custom_best, goal_nl)
+        if custom_score >= 1 and custom_score * 2 > platform_score:
+            return _select_output(node_input, custom_best, custom_store)
+
+    # ── Platform routing (twitter/instagram/linkedin × writer/reviewer) ──────────
+    if not channel_key:
+        return Event(
+            output=node_input,
+            route="none",
+            content=_content("Could not resolve a target platform for this task."),
+        )
+    if platform_best is None:
+        return Event(
+            output=node_input,
+            route="none",
+            content=_content("Could not select a specialist."),
+        )
+
+    chosen, store = platform_best, platform_store
 
     if _score(chosen, channel_key, review) < _GAP_SCORE_THRESHOLD:
         role = "reviewer" if review else "writer"
@@ -141,20 +236,4 @@ async def select_specialist(node_input: dict[str, Any]) -> Any:
             ),
         )
 
-    agent_card = AgentCard.from_skill_card(chosen)
-
-    return Event(
-        route=store,  # "market" (rent, pay-per-use) or "owned" (free, self-issued)
-        output={
-            **node_input,
-            "selected_skill_id": chosen.skill_id,
-            "skill_store": store,
-            "agent_card": agent_card.model_dump(),
-            "skill_card": chosen.model_dump(),
-        },
-        content=_content(
-            f"Selected: {chosen.display_name} ({chosen.agent_name}) [{store}]\n"
-            f"  Base fee: ${chosen.pricing.base_fee_cents / 100:.2f}  "
-            f"Completion fee: ${chosen.pricing.completion_fee_cents / 100:.2f}"
-        ),
-    )
+    return _select_output(node_input, chosen, store)

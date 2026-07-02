@@ -40,6 +40,10 @@ class SkillCard(BaseModel):
     specialties: list[str]  # ["doc-writing","content-writing"]
     instruction: str        # scoped system prompt the runtime loads (F1 AgentNodeDesign.instruction)
     model: str = "ollama/gemma2:2b"
+    match_keywords: list[str] = []   # Phase 3 CUSTOM skills: free-form terms matched against the
+                            # task text (goal_nl). Non-empty ⇒ this is a user-UPLOADED custom skill,
+                            # selected by keyword overlap rather than the closed platform+role router.
+                            # Empty ⇒ a platform skill (twitter/instagram/linkedin), routed as before.
     required_capabilities: list[CapabilityRef]   # Phase 1: EXACTLY ONE entry
     pricing: SkillPricing
     public_key: dict        # JWK — per-skill signing identity (A9)

@@ -1152,3 +1152,21 @@ section h3 {
   .flow-item { flex-direction: column; width: 100%; }
   .flow-node { width: 100%; max-width: 320px; }
 }
+
+/* ── Sell a Skill form (Phase 3) ───────────────────────────────────────────── */
+.sell-form { margin-top: 8px; }
+.sell-field { display: flex; flex-direction: column; gap: 6px; }
+.sell-label { font-size: 0.82rem; font-weight: 600; color: var(--text-2, #444); }
+.sell-input {
+  width: 100%;
+  padding: 11px 13px;
+  font: inherit;
+  color: var(--text, #202124);
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md, 10px);
+  box-sizing: border-box;
+  transition: border-color .15s ease;
+}
+.sell-input:focus { outline: none; border-color: var(--primary, #6B3FD4); }
+textarea.sell-input { resize: vertical; line-height: 1.5; }

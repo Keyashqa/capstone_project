@@ -55,6 +55,7 @@ def _load_skill_card(skill_dir: Path, owner_id: str = DEFAULT_OWNER_ID) -> Skill
         specialties=meta["specialties"],
         instruction=instruction,
         model=meta.get("model", "ollama/gemma2:2b"),
+        match_keywords=meta.get("match_keywords", []),  # Phase 3 custom skills; [] for platform skills
         required_capabilities=[CapabilityRef(**c) for c in meta["required_capabilities"]],
         pricing=SkillPricing(**meta["pricing"]),
         public_key=skill_public_key_dict(skill_id, owner_id),  # per-owner signing identity (A9)
@@ -79,13 +80,28 @@ def _seed_dir_flat(base_dir: Path, registry, owner_id: str = DEFAULT_OWNER_ID) -
 
 
 def seed_catalog() -> None:
-    """Register every skill found under agent-skills/ into the marketplace registry.
+    """Register every skill under agent-skills/ into the marketplace registry.
 
-    Marketplace is still flat (`agent-skills/<slug>/`), all owner_id="marvis".
-    Idempotent: skills already present are left untouched, so repeated calls
-    (e.g. on module re-import) are safe.
+    Handles BOTH layouts side by side (Phase 3):
+      • flat  `agent-skills/<slug>/`            → the platform's own owner="marvis" skills
+      • owned `agent-skills/<owner_id>/<slug>/` → skills a seller has LISTED (audit §A)
+    A directory is a skill iff it contains skill.json; otherwise it's an owner
+    directory whose children are that owner's listings. Idempotent, same as before.
     """
-    _seed_dir_flat(SKILLS_DIR, get_registry(), DEFAULT_OWNER_ID)
+    registry = get_registry()
+    if not SKILLS_DIR.exists():
+        return
+    for entry in sorted(SKILLS_DIR.iterdir()):
+        if not entry.is_dir():
+            continue
+        if (entry / "skill.json").exists():
+            # flat platform skill (owner "marvis")
+            card = _load_skill_card(entry, DEFAULT_OWNER_ID)
+            if not registry.has(card.skill_id, card.owner_id):
+                registry.register(card)
+        else:
+            # owner-namespaced listings: agent-skills/<owner_id>/<slug>/
+            _seed_dir_flat(entry, registry, entry.name)
 
 
 def seed_owned_library() -> None:

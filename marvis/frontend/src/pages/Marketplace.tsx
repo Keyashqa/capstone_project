@@ -5,7 +5,7 @@ import { apiGetAgents, type MarketAgent } from '../api'
 interface Props {
   email: string
   balanceCents: number
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace') => void
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell') => void
   onLogout: () => void
 }
 

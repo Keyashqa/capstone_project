@@ -5,7 +5,7 @@ import { apiGetPlatformStats, type PlatformFeedEvent, type PlatformStats } from 
 interface Props {
   email: string
   balanceCents: number
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform') => void
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell') => void
   onLogout: () => void
 }
 
@@ -20,6 +20,13 @@ const FEED_META: Record<string, { icon: string; tone: 'credit' | 'debit'; label:
     tone: 'credit',
     label: e => `Paid to ${e.to_account.replace(/^agent:/, '')}`,
   },
+  payout_owner: {
+    icon: '✅',
+    tone: 'credit',
+    label: e => `Owner earnings → ${e.to_account.replace(/^agent:owner:/, '')}`,
+  },
+  payout_commission: { icon: '🏦', tone: 'credit', label: () => 'Broker commission (10%)' },
+  payout_broker: { icon: '🏦', tone: 'credit', label: () => 'Broker payout (unowned skill)' },
   completion_refund: { icon: '↩️', tone: 'debit', label: () => 'Completion fee refunded' },
   build_completion_refund: { icon: '↩️', tone: 'debit', label: () => 'Build fee refunded' },
 }
@@ -91,18 +98,42 @@ export default function PlatformVolume({ email, balanceCents, onNavigate, onLogo
                 <div className="market-stat-label">Paid to agents</div>
               </div>
               <div className="market-stat">
-                <div className="market-stat-num">{fmt$(stats.total_refunded_cents)}</div>
-                <div className="market-stat-label">Refunded</div>
+                <div className="market-stat-num">{fmt$(stats.broker_revenue_cents ?? 0)}</div>
+                <div className="market-stat-label">Broker revenue</div>
               </div>
               <div className="market-stat">
-                <div className="market-stat-num">{fmt$(stats.total_topped_up_cents)}</div>
-                <div className="market-stat-label">Topped up</div>
+                <div className="market-stat-num">{fmt$(stats.commission_cents ?? 0)}</div>
+                <div className="market-stat-label">Commission (10%)</div>
+              </div>
+              <div className="market-stat">
+                <div className="market-stat-num">{fmt$(stats.total_refunded_cents)}</div>
+                <div className="market-stat-label">Refunded</div>
               </div>
               <div className="market-stat">
                 <div className="market-stat-num">{stats.hire_count}</div>
                 <div className="market-stat-label">Hires</div>
               </div>
             </div>
+          )}
+
+          {!loading && stats && (stats.per_owner?.length ?? 0) > 0 && (
+            <section>
+              <h3>Seller earnings</h3>
+              <div className="txn-list">
+                {stats.per_owner.map(o => (
+                  <div className="txn-item" key={o.owner_id}>
+                    <span className="txn-icon txn-icon-credit">🧑‍💼</span>
+                    <div className="txn-main">
+                      <div className="txn-reason">{o.owner_id}</div>
+                      <div className="txn-label">Base (100%) + completion (90%) across all hires</div>
+                    </div>
+                    <div className="txn-amount">
+                      <span className="txn-credit">{fmt$(o.earned_cents)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
 
           {!loading && stats && stats.per_agent.length > 0 && (

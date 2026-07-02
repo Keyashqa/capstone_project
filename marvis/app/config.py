@@ -62,3 +62,21 @@ DISPATCH_TIMEOUT_SECONDS: int = int(_get("DISPATCH_TIMEOUT_SECONDS", "120"))
 # NOT wired into payout.py yet — pay_completion still pays 100% to the agent.
 COMMISSION_RATE_BPS: int = int(_get("COMMISSION_RATE_BPS", "1000"))   # 1000 bps = 10%
 COMMISSION_BASIS: str = _get("COMMISSION_BASIS", "completion")        # "completion" only
+
+# ── Phase 3 demo seed (LOCAL demo accounts — NOT real secrets) ────────────────
+# Seeds a real seller ("alice") + a funded buyer/operator through the existing
+# users/wallets/keys tables so the earnings loop can be demonstrated end-to-end
+# without a signup UI (plan3.md §P3-6c). Values are overridable via .env; the
+# defaults are demo-only and carry no security meaning.
+DEMO_SEED_ENABLED: bool = _get("DEMO_SEED_ENABLED", "true").lower() == "true"
+DEMO_SELLER_ID: str = _get("DEMO_SELLER_ID", "alice")                 # == users.id == owner_id
+DEMO_SELLER_EMAIL: str = _get("DEMO_SELLER_EMAIL", "alice@marvis.local")
+DEMO_BUYER_ID: str = _get("DEMO_BUYER_ID", "operator")               # the funded hirer
+DEMO_BUYER_EMAIL: str = _get("DEMO_BUYER_EMAIL", "operator@marvis.local")
+DEMO_PASSWORD: str = _get("DEMO_PASSWORD", "marvis-demo")            # demo-only
+DEMO_PIN: str = _get("DEMO_PIN", "1234")                             # demo-only
+DEMO_BUYER_TOPUP_CENTS: int = int(_get("DEMO_BUYER_TOPUP_CENTS", "5000"))  # $50 float
+# The skill "alice" lists to the marketplace. Twitter has NO owned competitor
+# (Marvis owns only linkedin from Phase 2), so a listed twitter skill wins the
+# hire cleanly and the Phase-1 flagship ("Write a tweet…") now pays alice.
+DEMO_LISTING_SLUG: str = _get("DEMO_LISTING_SLUG", "twitter-writer")

@@ -283,7 +283,10 @@ async def _call_create_doc(
         create_result = await session.call_tool("create_doc", create_args)
         create_text = "".join(getattr(b, "text", "") for b in create_result.content)
 
-    return _extract_doc_id(create_text) or "created"
+    doc_id = _extract_doc_id(create_text)
+    if not doc_id:
+        print(f"[create_doc] WARNING: could not extract doc_id from response. Full response:\n{create_text!r}")
+    return doc_id or "created"
 
 
 async def _call_get_doc_content(

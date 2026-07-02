@@ -8,7 +8,7 @@ import Sidebar, { BrandMark } from '../components/Sidebar'
 
 interface Props {
   auth: AuthState
-  onNavigate: (page: 'wallet' | 'chat' | 'marketplace') => void
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell') => void
   onLogout: () => void
   onBalanceChange?: (cents: number) => void
 }

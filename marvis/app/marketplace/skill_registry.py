@@ -51,6 +51,17 @@ class InMemorySkillRegistry:
         """Select candidates for a task. Returns all cards whose specialties or description match."""
         return self.find_by_specialty(task_type)
 
+    def find_custom_matches(self, goal_nl: str) -> list[SkillCard]:
+        """Phase 3: custom (user-uploaded) skills whose match_keywords overlap the
+        raw task text. These are matched by free-form keyword rather than the closed
+        platform+role router, so a listed 'Email Writer' can be hired for an email
+        task. Platform skills (empty match_keywords) are never returned here."""
+        g = goal_nl.lower()
+        return [
+            card for card in self._skills.values()
+            if card.match_keywords and any(kw.lower() in g for kw in card.match_keywords)
+        ]
+
 
 # ── Module-level singleton — the MARKETPLACE store (rented/hired skills) ──────
 _registry: InMemorySkillRegistry | None = None

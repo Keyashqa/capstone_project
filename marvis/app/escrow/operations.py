@@ -37,19 +37,42 @@ async def hold_in_escrow(
     )
 
 
+async def release_from_escrow(
+    task_id: str,
+    to_account: str,
+    amount_cents: int,
+    reason: str = "payout",
+) -> str:
+    """Move escrow:{task_id} → any account. Returns journal_id.
+
+    The Phase 3 generic release primitive: the split (owner / broker) and the
+    fail-path base sweep all route through here, so every payout leg is one
+    balanced, zero-sum double-entry transfer out of the same escrow account.
+    """
+    return await wallet.transfer(
+        from_account=escrow_account(task_id),
+        to_account=to_account,
+        amount_cents=amount_cents,
+        reason=reason,
+        reference_id=task_id,
+    )
+
+
 async def release_to_agent(
     task_id: str,
     agent_name: str,
     amount_cents: int,
     reason: str = "payout",
 ) -> str:
-    """Move escrow:{task_id} → agent:{agent_name}. Returns journal_id."""
-    return await wallet.transfer(
-        from_account=escrow_account(task_id),
+    """Move escrow:{task_id} → agent:{agent_name}. Returns journal_id.
+
+    Back-compat thin wrapper over release_from_escrow (Phase 1/2 payout path).
+    """
+    return await release_from_escrow(
+        task_id=task_id,
         to_account=agent_account(agent_name),
         amount_cents=amount_cents,
         reason=reason,
-        reference_id=task_id,
     )
 
 

@@ -72,6 +72,8 @@ def marketplace_agents() -> dict:
             "skill_id": c.skill_id,
             "agent_name": c.agent_name,
             "display_name": c.display_name,
+            "owner_id": c.owner_id,
+            "is_custom": bool(c.match_keywords),
             "version": c.version,
             "description": c.description,
             "specialties": c.specialties,
@@ -121,6 +123,107 @@ def owned_skills() -> dict:
         for c in cards
     ]
     return {"skills": skills, "count": len(skills)}
+
+
+@app.post("/skills/list")
+def list_skill_endpoint(body: dict) -> dict:
+    """List a marketplace slug under the authenticated caller as its owner (Phase 3).
+
+    The general write-path counterpart to the demo seed (plan3.md §P3-5.1) — a
+    single write, no delist/edit CRUD. Promotes the flat template `skill_id`'s
+    content under the caller's ownership so future hires earn for them.
+    """
+    from fastapi import HTTPException
+
+    from app.auth import _get_user_from_token
+    from app.marketplace.listing import list_skill
+    from app.marketplace.seed import SKILLS_DIR, _load_skill_card
+
+    token = body.get("token", "")
+    skill_id = body.get("skill_id", "")
+    user = _get_user_from_token(token)  # 401s on a bad/expired token
+
+    slug = skill_id.removeprefix("skill-")
+    src_dir = SKILLS_DIR / slug
+    if not (src_dir / "skill.json").exists():
+        raise HTTPException(status_code=404, detail=f"No template skill '{skill_id}' to list")
+
+    listed = list_skill(_load_skill_card(src_dir), owner_id=user["id"])
+    return {
+        "skill_id": listed.skill_id,
+        "owner_id": listed.owner_id,
+        "owner_account": listed.owner_account,
+    }
+
+
+@app.post("/skills/create")
+def create_skill_endpoint(body: dict) -> dict:
+    """Create + list a CUSTOM skill from user-supplied metadata (Phase 3 upload tab).
+
+    The caller becomes the owner; when someone else hires the skill, the caller
+    earns via the payout split. Custom skills are matched to tasks by their
+    `match_keywords` (not the closed platform router). The tool is restricted to
+    the two real gdocs tools — no fabricated tools (Phase 1/2 invariant).
+    """
+    import re
+
+    from fastapi import HTTPException
+
+    from app.auth import _get_user_from_token
+    from app.marketplace.listing import list_skill
+    from app.marketplace.skill_card import CapabilityRef, SkillCard, SkillPricing
+
+    user = _get_user_from_token(body.get("token", ""))  # 401s on bad/expired token
+
+    display_name = str(body.get("display_name", "")).strip()
+    description = str(body.get("description", "")).strip()
+    instruction = str(body.get("instruction", "")).strip()
+    tool_name = str(body.get("tool_name", "")).strip()
+    base = int(body.get("base_fee_cents", 0))
+    completion = int(body.get("completion_fee_cents", 0))
+
+    raw_kw = body.get("match_keywords", [])
+    if isinstance(raw_kw, str):
+        raw_kw = raw_kw.split(",")
+    keywords = [k.strip() for k in raw_kw if str(k).strip()]
+
+    # ── Validation (fabricated tools + malformed input rejected) ──────────────
+    if not display_name or not instruction:
+        raise HTTPException(status_code=400, detail="display_name and instruction are required")
+    if tool_name not in ("create_doc", "get_doc_content"):
+        raise HTTPException(status_code=400, detail="tool_name must be create_doc or get_doc_content")
+    if not keywords:
+        raise HTTPException(status_code=400, detail="at least one match keyword is required so the skill can be hired")
+    if base < 0 or completion < 0 or (base + completion) <= 0:
+        raise HTTPException(status_code=400, detail="fees must be non-negative and total more than 0")
+    if base > 1_000_000 or completion > 1_000_000:
+        raise HTTPException(status_code=400, detail="fee too large")
+
+    slug = re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", display_name.lower())).strip("-") or "skill"
+    skill_id = f"skill-{slug}"
+    agent_name = re.sub(r"[^A-Za-z0-9]+", " ", display_name).title().replace(" ", "") or "CustomSkill"
+    why = "save the produced document" if tool_name == "create_doc" else "read the source document"
+
+    card = SkillCard(
+        skill_id=skill_id,
+        agent_name=agent_name,
+        display_name=display_name,
+        description=description or display_name,
+        specialties=keywords,
+        instruction=instruction,
+        match_keywords=keywords,
+        required_capabilities=[CapabilityRef(mcp_server="gdocs", tool_name=tool_name, why=why)],
+        pricing=SkillPricing(base_fee_cents=base, completion_fee_cents=completion),
+        public_key={},  # list_skill mints the real per-owner key
+    )
+    listed = list_skill(card, owner_id=user["id"])
+    return {
+        "skill_id": listed.skill_id,
+        "agent_name": listed.agent_name,
+        "owner_id": listed.owner_id,
+        "owner_account": listed.owner_account,
+        "match_keywords": listed.match_keywords,
+    }
 
 
 @app.get("/platform/stats")

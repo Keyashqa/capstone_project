@@ -79,6 +79,8 @@ export interface MarketAgent {
   skill_id: string
   agent_name: string
   display_name: string
+  owner_id?: string
+  is_custom?: boolean
   version: string
   description: string
   specialties: string[]
@@ -95,6 +97,33 @@ export async function apiGetAgents(): Promise<MarketAgent[]> {
   if (!r.ok) throw new Error('Failed to load marketplace')
   const d = await r.json()
   return d.agents as MarketAgent[]
+}
+
+export interface CreateSkillInput {
+  display_name: string
+  description: string
+  instruction: string
+  tool_name: 'create_doc' | 'get_doc_content'
+  match_keywords: string[]
+  base_fee_cents: number
+  completion_fee_cents: number
+}
+
+export interface CreatedSkill {
+  skill_id: string
+  agent_name: string
+  owner_id: string
+  owner_account: string
+  match_keywords: string[]
+}
+
+export async function apiCreateSkill(token: string, input: CreateSkillInput): Promise<CreatedSkill> {
+  const r = await fetch(`${AGENT}/skills/create`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, ...input }),
+  })
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || 'Failed to publish skill') }
+  return r.json()
 }
 
 export interface OwnedSkill {
@@ -131,13 +160,21 @@ export interface PlatformAgentEarnings {
   earned_cents: number
 }
 
+export interface PlatformOwnerEarnings {
+  owner_id: string
+  earned_cents: number
+}
+
 export interface PlatformStats {
   total_volume_cents: number
   total_paid_to_agents_cents: number
   total_refunded_cents: number
   total_topped_up_cents: number
   hire_count: number
+  broker_revenue_cents: number
+  commission_cents: number
   per_agent: PlatformAgentEarnings[]
+  per_owner: PlatformOwnerEarnings[]
   feed: PlatformFeedEvent[]
 }
 

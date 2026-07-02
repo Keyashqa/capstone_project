@@ -84,9 +84,10 @@ async def dispatch_to_specialist(node_input: dict[str, Any]) -> Any:
     grant_token: str = node_input.get("grant_token", "")
     spec: dict = node_input.get("spec", {})
     skill_store: str = node_input.get("skill_store", "market")
+    owner_id: str = node_input.get("selected_owner_id", "marvis")
 
     registry = get_owned_registry() if skill_store == "owned" else get_registry()
-    skill_card = registry.get(skill_id)
+    skill_card = registry.get(skill_id, owner_id)  # Phase 3: composite (owner_id, skill_id)
 
     grant_registry = get_grant_registry()
     grant = None

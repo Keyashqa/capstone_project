@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar'
 interface Props {
   token: string
   email: string
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace') => void
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell') => void
   onLogout: () => void
 }
 
