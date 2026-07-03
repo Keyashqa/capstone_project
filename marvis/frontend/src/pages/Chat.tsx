@@ -5,38 +5,39 @@ import {
 } from '../api'
 import A2uiRenderer from '../components/A2uiRenderer'
 import Sidebar, { BrandMark } from '../components/Sidebar'
+import Icon, { type IconName } from '../components/Icon'
 import { notifyBalanceChanged } from '../balanceBus'
 
 interface Props {
   auth: AuthState
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed') => void
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed' | 'about') => void
   onLogout: () => void
 }
 
 const uid = () => Math.random().toString(36).slice(2)
 
-const SUGGESTIONS = [
-  'Write a tweet about my Marvis launch and save it as a Google Doc',
-  'Draft a short product update post',
-  'Summarize a document for me',
+const SUGGESTIONS: { text: string; icon: IconName }[] = [
+  { text: 'Write a tweet about my Marvis launch and save it as a Google Doc', icon: 'doc' },
+  { text: 'Draft a LinkedIn announcement about our new feature', icon: 'sparkle' },
+  { text: 'Write an Instagram caption for my product launch', icon: 'star' },
 ]
 
 // ── Workflow activity feed ──────────────────────────────────
-function statusMeta(raw: string): { icon: string; tone: 'ok' | 'default' | 'error' } {
+function statusMeta(raw: string): { icon: IconName; tone: 'ok' | 'default' | 'error' } {
   const t = raw.toLowerCase()
   if (/(failed|invalid|denied|cancelled|canceled|error|warning|timed out|could not|no specialist)/.test(t))
-    return { icon: '⚠️', tone: 'error' }
-  if (t.includes('pin confirmed')) return { icon: '🔐', tone: 'ok' }
-  if (t.includes('checkout created')) return { icon: '🧾', tone: 'default' }
-  if (t.includes('cartmandate verified')) return { icon: '🛡️', tone: 'ok' }
-  if (t.includes('moved to escrow')) return { icon: '🔒', tone: 'default' }
-  if (t.includes('grant')) return { icon: '🔑', tone: 'default' }
-  if (t.includes('completed the task')) return { icon: '✅', tone: 'ok' }
-  if (t.includes('released to agent') || t.includes('payout')) return { icon: '💸', tone: 'ok' }
-  if (t.includes('escrow settled')) return { icon: '🤝', tone: 'ok' }
-  if (t.includes('verification') || t.includes('checks') || t.includes('advisory')) return { icon: '🔍', tone: 'default' }
-  if (t.includes('found') && t.includes('specialist')) return { icon: '🔎', tone: 'default' }
-  return { icon: '•', tone: 'default' }
+    return { icon: 'warning', tone: 'error' }
+  if (t.includes('pin confirmed')) return { icon: 'checkCircle', tone: 'ok' }
+  if (t.includes('checkout created')) return { icon: 'receipt', tone: 'default' }
+  if (t.includes('cartmandate verified')) return { icon: 'shieldCheck', tone: 'ok' }
+  if (t.includes('moved to escrow')) return { icon: 'lock', tone: 'default' }
+  if (t.includes('grant')) return { icon: 'key', tone: 'default' }
+  if (t.includes('completed the task')) return { icon: 'checkCircle', tone: 'ok' }
+  if (t.includes('released to agent') || t.includes('payout')) return { icon: 'cash', tone: 'ok' }
+  if (t.includes('escrow settled')) return { icon: 'swap', tone: 'ok' }
+  if (t.includes('verification') || t.includes('checks') || t.includes('advisory')) return { icon: 'search', tone: 'default' }
+  if (t.includes('found') && t.includes('specialist')) return { icon: 'user', tone: 'default' }
+  return { icon: 'dot', tone: 'default' }
 }
 
 // Highlight id-like tokens (bkg-…, txn-…, grant-…, escrow:…) as chips
@@ -63,8 +64,8 @@ function StatusFeed({ statuses }: { statuses: string[] }) {
         const [title, ...rest] = lines
         const last = idx === statuses.length - 1
         return (
-          <div key={idx} className={`status-row status-${tone}${last ? ' status-row-last' : ''}`}>
-            <span className="status-dot">{icon}</span>
+          <div key={idx} className={`status-row status-${tone}${last ? ' status-row-last status-row-active' : ''}`}>
+            <span className="status-dot"><Icon name={icon} size={14} /></span>
             <div className="status-body">
               <div className="status-title">{highlightIds(title ?? '', `t${idx}`)}</div>
               {rest.map((l, i) => (
@@ -87,8 +88,16 @@ export default function Chat({ auth, onNavigate, onLogout }: Props) {
   const [input, setInput] = useState('')
 
   const bottomRef = useRef<HTMLDivElement>(null)
+  // StrictMode (dev) mounts effects twice; without this guard initSession runs
+  // twice — two sessions + two greetings — which briefly flips the empty state
+  // into a duplicated message view (a visible flash on open).
+  const initedRef = useRef(false)
 
-  useEffect(() => { initSession() }, [])
+  useEffect(() => {
+    if (initedRef.current) return
+    initedRef.current = true
+    initSession()
+  }, [])
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   const addMsg = (role: Message['role'], text: string) =>
@@ -151,7 +160,7 @@ export default function Chat({ auth, onNavigate, onLogout }: Props) {
     try {
       const sid = await apiCreateAdkSession(auth.token)
       setSessionId(sid)
-      addMsg('agent', 'Hi! I\'m Marvis, your personal AI orchestrator. Tell me what you\'d like to create today — for example: "Write a tweet about my Marvis launch and save it as a Twitter script in Google Docs."')
+      addMsg('agent', 'Hi! I\'m Marvis. Describe what you\'d like written — a launch post, an announcement, a promo — and I\'ll hire the right niche skill, check the work, and only pay once it passes. For example: "Write a tweet about my Marvis launch and save it as a Twitter script in Google Docs."')
       setBusy(false)
     } catch {
       addMsg('system', 'Failed to connect to Marvis server (port 8000). Is the agent running?')
@@ -213,7 +222,7 @@ export default function Chat({ auth, onNavigate, onLogout }: Props) {
     }
   }
 
-  const showSuggestions = messages.length <= 1 && !busy && !hitl
+  const showEmpty = messages.length <= 1 && !busy && !hitl
 
   return (
     <div className="app-shell">
@@ -227,6 +236,33 @@ export default function Chat({ auth, onNavigate, onLogout }: Props) {
 
       <div className="chat-main">
       <div className="messages">
+        {showEmpty ? (
+          <div className="chat-empty">
+            <span className="chat-empty-mark"><BrandMark size={58} /></span>
+            <h1 className="chat-empty-title">What can I get done for you?</h1>
+            <p className="chat-empty-sub">
+              Describe a goal in plain English. Marvis hires the right niche skill, runs the work,
+              and only releases payment once it's verified.
+            </p>
+            <div className="empty-suggestions">
+              {SUGGESTIONS.map((s, i) => (
+                <button
+                  key={s.text}
+                  className="empty-suggestion"
+                  style={{ animationDelay: `${0.09 * i + 0.12}s` }}
+                  onClick={() => sendGoal(s.text)}
+                >
+                  <span className="empty-suggestion-icon"><Icon name={s.icon} size={18} /></span>
+                  <span className="empty-suggestion-text">{s.text}</span>
+                  <svg className="empty-suggestion-arrow" viewBox="0 0 24 24" width="16" height="16"
+                    fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
         <div className="messages-inner">
           {messages.map(m => {
             if (m.role === 'system') {
@@ -266,19 +302,11 @@ export default function Chat({ auth, onNavigate, onLogout }: Props) {
           )}
           <div ref={bottomRef} />
         </div>
+        )}
       </div>
 
       <div className="composer">
         <div className="composer-inner">
-          {showSuggestions && (
-            <div className="suggestions">
-              {SUGGESTIONS.map(s => (
-                <button key={s} className="suggestion-chip" onClick={() => sendGoal(s)}>
-                  {s}
-                </button>
-              ))}
-            </div>
-          )}
           <div className="chat-input-row">
             <input
               className="chat-input"

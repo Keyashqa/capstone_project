@@ -1,5 +1,6 @@
 import { BrandMark } from '../components/Sidebar'
 import BrandWord from '../components/BrandWord'
+import Icon, { type IconName } from '../components/Icon'
 
 interface Props {
   onGetStarted: () => void
@@ -10,19 +11,19 @@ function MPayWordmark() {
   return <BrandWord text="MPay" />
 }
 
-const FEATURES = [
+const FEATURES: { icon: IconName; title: string; body: string }[] = [
   {
-    icon: '💬',
+    icon: 'chat',
     title: 'Just describe your goal',
     body: 'No prompt engineering, no tools to wire up. Chat with Marvis in plain English and it figures out the rest.',
   },
   {
-    icon: '🧑‍🚀',
-    title: 'Marvis hires the right skill',
-    body: 'From a live marketplace of skills — writers, researchers, doc builders — Marvis picks the best fit for the job.',
+    icon: 'bolt',
+    title: 'Marvis hires the right niche skill',
+    body: 'From a marketplace of niche writing skills — each tuned to a platform, task, and voice — Marvis picks the best fit for your job.',
   },
   {
-    icon: '✅',
+    icon: 'shieldCheck',
     title: 'Only pay for verified work',
     body: 'Every deliverable is checked before money moves. MPay holds funds in escrow until the work actually passes.',
   },
@@ -35,12 +36,12 @@ const STEPS = [
   { n: 4, title: 'Verify, then pay with MPay', body: 'Marvis checks the result and releases payment on your OK.' },
 ]
 
-const MPAY_FLOW = [
-  { icon: '💰', title: 'Top up', body: 'Add funds to your MPay wallet.', tag: 'MPay' },
-  { icon: '🛒', title: 'Hire & quote', body: 'Marvis gets a signed CartMandate — a tamper-proof quote — from the marketplace.', tag: 'UCP' },
-  { icon: '🔒', title: 'Authorize & escrow', body: 'Your PIN signs a PaymentMandate (SD-JWT); MPay locks the funds in escrow.', tag: 'AP2' },
-  { icon: '⚙️', title: 'Work & verify', body: 'The hired skill does the job; Marvis verifies the result.', tag: null },
-  { icon: '🤝', title: 'Settle', body: 'Passes → the skill is paid. Fails → you’re refunded.', tag: 'MPay' },
+const MPAY_FLOW: { icon: IconName; title: string; body: string; tag: string | null }[] = [
+  { icon: 'wallet', title: 'Top up', body: 'Add funds to your MPay wallet.', tag: 'MPay' },
+  { icon: 'cart', title: 'Hire & quote', body: 'Marvis gets a signed CartMandate — a tamper-proof quote — from the marketplace.', tag: 'UCP' },
+  { icon: 'lock', title: 'Authorize & escrow', body: 'Your PIN signs a PaymentMandate (SD-JWT); MPay locks the funds in escrow.', tag: 'AP2' },
+  { icon: 'gear', title: 'Work & verify', body: 'The hired skill does the job; Marvis verifies the result.', tag: null },
+  { icon: 'swap', title: 'Settle', body: 'Passes → the skill is paid. Fails → you’re refunded.', tag: 'MPay' },
 ]
 
 const PROTOCOLS = [
@@ -92,22 +93,23 @@ export default function Landing({ onGetStarted, onSignIn }: Props) {
       {/* ── Hero ── */}
       <section className="hero">
         <div className="hero-copy">
-          <span className="hero-badge">✦ Your personal AI orchestrator</span>
-          <h1>Tell Marvis what you need.<br />It gets it done.</h1>
+          <span className="hero-badge"><Icon name="sparkle" size={15} /> A marketplace of niche AI ghostwriters</span>
+          <h1>Tell Marvis what you need.<br />It gets it written.</h1>
           <p className="hero-sub">
-            Marvis hires the right skill, coordinates the work, and pays for it
-            securely through <MPayWordmark /> — only when the job is verified. You just describe the goal.
+            Marvis is a marketplace of niche writing skills — each in a creator's own voice. Describe your
+            goal and Marvis hires the right one, verifies the work, and pays through <MPayWordmark /> only
+            when it passes.
           </p>
           <div className="hero-cta">
             <button className="btn-hero" onClick={onGetStarted}>Get started free</button>
             <button className="btn-hero-ghost" onClick={onSignIn}>I already have an account</button>
           </div>
           <div className="hero-trust">
-            <span>🔒 Escrow-backed payments</span>
-            <span>·</span>
-            <span>✓ Verified deliverables</span>
-            <span>·</span>
-            <span>⚡ Runs on your terms</span>
+            <span><Icon name="lock" size={15} /> Escrow-backed payments</span>
+            <span className="hero-trust-sep">·</span>
+            <span><Icon name="shieldCheck" size={15} /> Verified deliverables</span>
+            <span className="hero-trust-sep">·</span>
+            <span><Icon name="bolt" size={15} /> Runs on your terms</span>
           </div>
         </div>
 
@@ -149,14 +151,15 @@ export default function Landing({ onGetStarted, onSignIn }: Props) {
           <span className="eyebrow">What is Marvis</span>
           <h2>An orchestrator, not just another chatbot</h2>
           <p className="section-sub">
-            Marvis is the layer between you and a marketplace of skills. It understands your goal,
-            hires the right skill, supervises the work, and settles payment — all in one conversation.
+            Marvis is the layer between you and a marketplace of niche writing skills. It understands your
+            goal, hires the right skill, supervises the work, and settles payment — and creators earn every
+            time their skill is hired.
           </p>
         </div>
         <div className="feature-grid">
           {FEATURES.map(f => (
             <div className="feature-card" key={f.title}>
-              <div className="feature-icon">{f.icon}</div>
+              <div className="feature-icon"><Icon name={f.icon} size={24} /></div>
               <h3>{f.title}</h3>
               <p>{f.body}</p>
             </div>
@@ -200,7 +203,7 @@ export default function Landing({ onGetStarted, onSignIn }: Props) {
           {MPAY_FLOW.map((step, i) => (
             <div className="flow-item" key={step.title}>
               <div className="flow-node">
-                <div className="flow-icon">{step.icon}</div>
+                <div className="flow-icon"><Icon name={step.icon} size={24} /></div>
                 <div className="flow-num">
                   Step {i + 1}
                   {step.tag && <span className={`flow-tag flow-tag-${step.tag.toLowerCase()}`}>{step.tag}</span>}

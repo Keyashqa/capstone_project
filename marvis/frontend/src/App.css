@@ -576,6 +576,14 @@ section h3 {
 .a2ui-column { display: flex; flex-direction: column; }
 .a2ui-row    { display: flex; flex-direction: row; flex-wrap: nowrap; }
 
+/* A Row/Column stacked inside a Column must span the full width, otherwise the
+   column's align-items (default flex-start) shrink-wraps it to its content and
+   `justify: spaceBetween` has no slack to distribute — the fee/label + value +
+   tag lines bunch to the left with dead space on the right. Weighted flex
+   children (flex-basis:0) are unaffected; their basis overrides this width. */
+.a2ui-column > .a2ui-row,
+.a2ui-column > .a2ui-column { width: 100%; }
+
 .a2ui-card {
   background: var(--surface);
   border-radius: var(--r-lg);
@@ -1315,3 +1323,256 @@ textarea.sell-input { resize: vertical; line-height: 1.5; }
   color: var(--text-muted); transition: background-color .15s, color .15s, box-shadow .15s;
 }
 .segmented-btn-active { background: #fff; color: var(--text); box-shadow: 0 1px 4px rgba(16,24,40,.14); }
+
+/* ═════════════════════════════════════════════════════════
+   POLISH PASS — line-icon alignment, chat empty state,
+   activity-feed timeline, motion, payment sheet
+   ═════════════════════════════════════════════════════════ */
+
+/* ── Line-icon color + alignment (replacing former emoji) ── */
+.feature-icon { color: var(--primary); }
+.flow-icon    { color: var(--green); }
+.a2ui-icon    { display: inline-flex; align-items: center; }
+.status-dot   { color: var(--text-muted); }
+.status-ok .status-dot    { color: var(--green); }
+.status-error .status-dot { color: var(--red); }
+
+.hero-badge {
+  display: inline-flex; align-items: center; gap: .4rem;
+}
+.hero-badge svg { color: var(--primary); }
+.hero-trust span { display: inline-flex; align-items: center; gap: .32rem; }
+.hero-trust span svg { color: var(--text-faint); }
+.hero-trust-sep { opacity: .5; }
+
+/* ── Chat empty state ─────────────────────────────────────── */
+.chat-empty {
+  min-height: 100%;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center;
+  max-width: 620px; margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+}
+.chat-empty-mark {
+  display: inline-flex;
+  animation: emptyPop .5s cubic-bezier(.2,.9,.3,1.2) both;
+}
+.chat-empty-title {
+  font-size: 1.9rem; font-weight: 800; letter-spacing: -.025em;
+  color: var(--text); margin: 1.15rem 0 .5rem;
+  text-wrap: balance;
+  animation: emptyUp .45s ease-out .06s both;
+}
+.chat-empty-sub {
+  font-size: 1rem; line-height: 1.6; color: var(--text-muted);
+  max-width: 46ch; margin: 0 0 2rem;
+  text-wrap: pretty;
+  animation: emptyUp .45s ease-out .12s both;
+}
+.empty-suggestions {
+  display: flex; flex-direction: column; gap: .6rem;
+  width: 100%; max-width: 440px;
+}
+.empty-suggestion {
+  display: flex; align-items: center; gap: .8rem;
+  width: 100%; text-align: left;
+  background: var(--surface); border: 1px solid var(--border-light);
+  border-radius: var(--r-md); padding: .85rem 1rem;
+  font-family: var(--font); font-size: .92rem; font-weight: 500; color: var(--text-2);
+  cursor: pointer; box-shadow: var(--shadow-xs);
+  transition: border-color .14s, box-shadow .14s, transform .12s, background .14s;
+  animation: emptyUp .45s ease-out both;
+}
+.empty-suggestion:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+.empty-suggestion-icon {
+  width: 34px; height: 34px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 9px; background: var(--primary-light); color: var(--primary);
+}
+.empty-suggestion-text { flex: 1; min-width: 0; }
+.empty-suggestion-arrow { color: var(--text-faint); flex-shrink: 0; transition: transform .14s, color .14s; }
+.empty-suggestion:hover .empty-suggestion-arrow { color: var(--primary); transform: translateX(2px); }
+
+/* ── Activity feed — timeline refinements ─────────────────── */
+.status-row { animation: rowIn .32s ease-out both; }
+.status-row::before { background: linear-gradient(var(--border), var(--border-light)); }
+.status-ok::before { background: linear-gradient(#BEE3C8, var(--border-light)); }
+.status-dot { transition: background .2s, border-color .2s, color .2s; }
+/* The live (latest) step gets a soft pulsing ring so the eye tracks progress */
+.status-row-active:not(.status-error) .status-dot {
+  animation: dotPulse 1.8s ease-out infinite;
+}
+@keyframes dotPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(26,115,232,.35); }
+  70%  { box-shadow: 0 0 0 7px rgba(26,115,232,0); }
+  100% { box-shadow: 0 0 0 0 rgba(26,115,232,0); }
+}
+.status-ok.status-row-active .status-dot { animation: dotPulseGreen 1.8s ease-out infinite; }
+@keyframes dotPulseGreen {
+  0%   { box-shadow: 0 0 0 0 rgba(52,168,83,.4); }
+  70%  { box-shadow: 0 0 0 7px rgba(52,168,83,0); }
+  100% { box-shadow: 0 0 0 0 rgba(52,168,83,0); }
+}
+
+/* ── Entrance motion for conversation elements ────────────── */
+.msg-row  { animation: msgIn .34s cubic-bezier(.2,.7,.2,1) both; }
+.msg-a2ui { animation: sheetIn .4s cubic-bezier(.2,.8,.2,1) both; }
+
+/* ── Payment card → feels like a payment sheet ────────────── */
+.msg-a2ui .a2ui-card {
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
+}
+
+@keyframes msgIn   { from { opacity: 0; transform: translateY(8px); }  to { opacity: 1; transform: none; } }
+@keyframes rowIn   { from { opacity: 0; transform: translateY(6px); }  to { opacity: 1; transform: none; } }
+@keyframes sheetIn { from { opacity: 0; transform: translateY(16px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes emptyUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes emptyPop { 0% { opacity: 0; transform: scale(.7); } 100% { opacity: 1; transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .msg-row, .msg-a2ui, .status-row,
+  .chat-empty-mark, .chat-empty-title, .chat-empty-sub, .empty-suggestion {
+    animation: none !important;
+  }
+  .status-row-active .status-dot { animation: none !important; }
+}
+
+/* ── About Platform page — reuses feature-card / market-hero language ── */
+/* About hero headline — branded blue→purple gradient wordmark */
+.about-hero h1 {
+  font-size: 2.1rem; line-height: 1.15; letter-spacing: -.025em;
+  text-wrap: balance;
+  color: var(--primary); /* fallback for engines without background-clip:text */
+  background: linear-gradient(115deg, var(--primary) 0%, #6B3FD4 100%);
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Platform × Task × Domain matrix — three accent-tinted columns of chips */
+.about-matrix {
+  display: flex; align-items: stretch; justify-content: center;
+  gap: .6rem; flex-wrap: wrap; margin-top: 1.5rem;
+}
+.about-matrix-col {
+  flex: 1 1 190px; min-width: 175px;
+  background: var(--surface); border: 1px solid var(--border-light);
+  border-top: 3px solid var(--border);
+  border-radius: var(--r-lg); padding: 1.15rem 1.15rem 1.3rem;
+  box-shadow: var(--shadow-xs);
+}
+.about-col-platform { border-top-color: var(--primary); }
+.about-col-task     { border-top-color: var(--green-mid); }
+.about-col-domain   { border-top-color: #9334E6; }
+.about-matrix-head {
+  font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+  margin-bottom: .9rem;
+}
+.about-col-platform .about-matrix-head { color: var(--primary); }
+.about-col-task     .about-matrix-head { color: var(--green); }
+.about-col-domain   .about-matrix-head { color: #7E27C9; }
+.about-matrix-items { display: flex; flex-direction: column; gap: .5rem; }
+.about-chip {
+  display: inline-flex; align-items: center; gap: .5rem;
+  background: var(--surface-2); border: 1px solid var(--border-light);
+  border-radius: var(--r-pill); padding: .5rem .85rem;
+  font-size: .88rem; font-weight: 600; color: var(--text-2);
+  transition: transform .12s, box-shadow .12s, background .12s;
+}
+.about-chip:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); background: var(--surface); }
+.about-chip-logo { display: inline-flex; flex-shrink: 0; }
+.about-matrix-x {
+  align-self: center; flex: 0 0 auto;
+  font-size: 1.5rem; font-weight: 800; color: var(--text-faint);
+}
+@media (max-width: 620px) {
+  .about-matrix-x { display: none; }
+  .about-matrix-col { flex-basis: 100%; }
+}
+
+/* Combinatorial space — O(M × N × L), M/N/L tinted to the matrix columns */
+.about-combos {
+  display: flex; flex-direction: column; align-items: center; gap: .3rem;
+  margin-top: 1.4rem;
+}
+.about-combos-formula {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.55rem; font-weight: 800; letter-spacing: .01em;
+  color: var(--text-2);
+}
+.combo-m { color: var(--primary); }
+.combo-n { color: var(--green); }
+.combo-l { color: #7E27C9; }
+.about-combos-note { font-size: .82rem; color: var(--text-faint); text-align: center; }
+
+/* Worked example under the matrix */
+.about-example {
+  display: flex; flex-direction: column; align-items: center; gap: .55rem;
+  margin-top: 1.35rem;
+}
+.about-example-label {
+  font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-faint);
+}
+.about-example-card {
+  display: inline-flex; align-items: center; gap: .65rem;
+  background: var(--surface); border: 1px solid var(--border-light);
+  border-radius: var(--r-pill); padding: .7rem 1.15rem;
+  box-shadow: var(--shadow-xs); max-width: 100%;
+}
+.about-example-icon { color: var(--primary); display: inline-flex; flex-shrink: 0; }
+.about-example-text { font-size: .95rem; font-weight: 600; color: var(--text-2); }
+
+.about-block { margin-top: 2.25rem; }
+.about-h2 {
+  font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em;
+  color: var(--text); margin: 0 0 1.1rem;
+}
+.about-two { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+
+.about-steps {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: .75rem;
+}
+.about-step {
+  display: flex; align-items: flex-start; gap: .9rem;
+  background: var(--surface); border: 1px solid var(--border-light);
+  border-radius: var(--r-lg); padding: 1.1rem 1.25rem; box-shadow: var(--shadow-xs);
+}
+.about-step-num {
+  width: 26px; height: 26px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--primary); color: #fff;
+  font-size: .82rem; font-weight: 800;
+}
+.about-step-icon {
+  flex-shrink: 0; color: var(--primary); display: inline-flex; align-items: center;
+  margin-top: 1px;
+}
+.about-step-text h4 { font-size: 1rem; font-weight: 700; color: var(--text); margin: 0 0 .25rem; }
+.about-step-text p  { font-size: .9rem; line-height: 1.55; color: var(--text-muted); margin: 0; }
+
+.about-callout {
+  display: flex; align-items: flex-start; gap: .8rem;
+  margin-top: 2.25rem;
+  background: var(--primary-soft); border: 1px solid #CFE0FB;
+  border-radius: var(--r-lg); padding: 1.15rem 1.35rem;
+  font-size: .95rem; line-height: 1.6; color: var(--text-2);
+}
+.about-callout b { color: var(--text); }
+.about-callout-icon { color: var(--primary); flex-shrink: 0; display: inline-flex; margin-top: 1px; }
+
+/* Three-sides cards get a bottom-pinned CTA so buttons align across the row */
+.about-side { display: flex; flex-direction: column; }
+.about-side-cta { margin-top: auto; align-self: flex-start; }
+
+@media (max-width: 720px) {
+  .about-two { grid-template-columns: 1fr; }
+}

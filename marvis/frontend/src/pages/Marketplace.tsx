@@ -7,7 +7,7 @@ import { apiGetAgents, type MarketAgent } from '../api'
 interface Props {
   email: string
   token: string
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed') => void
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed' | 'about') => void
   onLogout: () => void
 }
 
@@ -22,10 +22,10 @@ const look = (name: string) =>
   AGENT_LOOKS[name] ?? { emoji: '🤖', accent: '#6B3FD4' }
 
 const STORYBOARD = [
-  { icon: '🛍️', title: 'Browse skills' },
+  { icon: '🛍️', title: 'Browse niche skills' },
   { icon: '💬', title: 'Describe your task' },
   { icon: '🤝', title: 'Marvis hires the match' },
-  { icon: '✅', title: 'Pay on delivery' },
+  { icon: '✅', title: 'Pay for verified work' },
 ]
 
 export default function Marketplace({ email, token, onNavigate, onLogout }: Props) {
@@ -84,7 +84,7 @@ export default function Marketplace({ email, token, onNavigate, onLogout }: Prop
             <div className="market-hero-top">
               <div>
                 <span className="eyebrow">Skills <BrandWord text="Marketplace" /></span>
-                <h1>Skills, ready to be hired</h1>
+                <h1>The right voice for every post</h1>
               </div>
               <div className="market-stats">
                 <div className="market-stat">
@@ -116,7 +116,7 @@ export default function Marketplace({ email, token, onNavigate, onLogout }: Prop
                 <path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
               <input
-                placeholder="Search agents, skills, or tasks…"
+                placeholder="Search by platform, task, or niche…"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
               />
@@ -148,7 +148,10 @@ export default function Marketplace({ email, token, onNavigate, onLogout }: Prop
           ) : error ? (
             <div className="market-note market-note-error">{error}</div>
           ) : filtered.length === 0 ? (
-            <div className="market-note">No skills match your search.</div>
+            <div className="market-note">
+              No niche skill matches that yet. Try a different platform or task — or just ask in Chat,
+              and Marvis will commission one to fit.
+            </div>
           ) : (
             <div className="owned-grid">
               {filtered.map(a => {
@@ -168,6 +171,16 @@ export default function Marketplace({ email, token, onNavigate, onLogout }: Prop
                       </div>
                     </div>
                     <p className="owned-desc">{a.description}</p>
+                    {a.specialties.length > 0 && (
+                      <div className="agent-tags" style={{ marginBottom: '.5rem' }}>
+                        {a.specialties.slice(0, 3).map(sp => (
+                          <span className="agent-tag" key={sp}>{sp}</span>
+                        ))}
+                        {a.specialties.length > 3 && (
+                          <span className="owned-tag-count">+{a.specialties.length - 3}</span>
+                        )}
+                      </div>
+                    )}
                     <div className="owned-foot">
                       <span className="owned-price-mini">{fmt$(total)} / task</span>
                     </div>

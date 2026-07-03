@@ -8,10 +8,11 @@ import OwnedSkills from './pages/OwnedSkills'
 import PlatformVolume from './pages/PlatformVolume'
 import SellSkill from './pages/SellSkill'
 import ContributedSkills from './pages/ContributedSkills'
+import AboutPlatform from './pages/AboutPlatform'
 import type { AuthState } from './api'
 import './App.css'
 
-type Page = 'landing' | 'auth' | 'wallet' | 'chat' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed'
+type Page = 'landing' | 'auth' | 'wallet' | 'chat' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed' | 'about'
 
 const STORAGE_KEY = 'marvis_auth'
 
@@ -125,6 +126,17 @@ export default function App() {
   if (page === 'contributed') {
     return (
       <ContributedSkills
+        email={auth.email}
+        token={auth.token}
+        onNavigate={setPage}
+        onLogout={handleLogout}
+      />
+    )
+  }
+
+  if (page === 'about') {
+    return (
+      <AboutPlatform
         email={auth.email}
         token={auth.token}
         onNavigate={setPage}

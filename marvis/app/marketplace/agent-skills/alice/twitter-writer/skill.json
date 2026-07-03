@@ -1,0 +1,32 @@
+{
+  "skill_id": "skill-twitter-writer",
+  "owner_id": "alice",
+  "owner_account": "alice",
+  "agent_name": "TwitterPostSpecialist",
+  "display_name": "Twitter Post Specialist",
+  "version": "1.0.0",
+  "description": "Writes engaging Twitter/X posts and saves them to Google Docs. For creating tweets and short-form social posts for Twitter.",
+  "specialties": [
+    "twitter",
+    "twitter-post",
+    "tweet",
+    "post-writing",
+    "content-writing",
+    "doc-writing",
+    "social-media"
+  ],
+  "model": "ollama/gemma2:2b",
+  "match_keywords": [],
+  "required_capabilities": [
+    {
+      "mcp_server": "gdocs",
+      "tool_name": "create_doc",
+      "why": "Save the written Twitter post as a Google Doc"
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 50,
+    "completion_fee_cents": 100
+  }
+}

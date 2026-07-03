@@ -6,7 +6,7 @@ import { apiCreateSkill, type CreatedSkill } from '../api'
 interface Props {
   token: string
   email: string
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed') => void
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed' | 'about') => void
   onLogout: () => void
 }
 
@@ -69,10 +69,10 @@ export default function SellSkill({ token, email, onNavigate, onLogout }: Props)
         <main className="page-wide">
           <div className="market-hero">
             <span className="eyebrow">Contribute a Skill</span>
-            <h1>Publish a skill to the marketplace</h1>
+            <h1>List a skill in your own voice</h1>
             <p className="market-hero-sub">
-              Describe a skill you want to contribute. When someone hires it, you earn — straight
-              into your <BrandWord text="MPay" /> wallet, no separate cash-out step.
+              Package your writing style as a niche skill — a platform, a task, a voice. When someone hires
+              it, you earn — straight into your <BrandWord text="MPay" /> wallet, no separate cash-out step.
             </p>
           </div>
 
@@ -96,7 +96,7 @@ export default function SellSkill({ token, email, onNavigate, onLogout }: Props)
               <div className="sell-form glass-panel">
                 <label className="sell-field">
                   <span className="sell-label">Skill name</span>
-                  <input className="sell-input" placeholder="e.g. Cold Outreach Email Writer"
+                  <input className="sell-input" placeholder="e.g. Bakery Instagram Caption Writer"
                     value={displayName} onChange={e => setDisplayName(e.target.value)} />
                 </label>
 
@@ -109,7 +109,7 @@ export default function SellSkill({ token, email, onNavigate, onLogout }: Props)
                 <label className="sell-field">
                   <span className="sell-label">Instruction (the skill's system prompt)</span>
                   <textarea className="sell-input" rows={6}
-                    placeholder="You are an expert cold-email copywriter. Write a concise, personalised outreach email…"
+                    placeholder="You are a warm, playful voice for a neighbourhood bakery. Write an Instagram caption that makes the day's bake feel irresistible…"
                     value={instruction} onChange={e => setInstruction(e.target.value)} />
                 </label>
 
@@ -125,7 +125,7 @@ export default function SellSkill({ token, email, onNavigate, onLogout }: Props)
 
                 <label className="sell-field">
                   <span className="sell-label">Match keywords (comma-separated — how tasks find this skill)</span>
-                  <input className="sell-input" placeholder="email, outreach, cold email"
+                  <input className="sell-input" placeholder="instagram, caption, bakery"
                     value={keywords} onChange={e => setKeywords(e.target.value)} />
                   {keywordList.length > 0 && (
                     <div className="agent-tags" style={{ marginTop: 8 }}>

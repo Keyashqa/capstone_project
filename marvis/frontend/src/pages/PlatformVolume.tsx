@@ -5,7 +5,7 @@ import { apiGetPlatformStats, type PlatformStats } from '../api'
 interface Props {
   email: string
   token: string
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed') => void
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed' | 'about') => void
   onLogout: () => void
 }
 

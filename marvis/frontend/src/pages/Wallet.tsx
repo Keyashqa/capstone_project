@@ -8,7 +8,7 @@ import { notifyBalanceChanged } from '../balanceBus'
 interface Props {
   token: string
   email: string
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed') => void
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed' | 'about') => void
   onLogout: () => void
 }
 

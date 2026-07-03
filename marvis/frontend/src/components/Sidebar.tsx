@@ -3,7 +3,7 @@ import { apiGetWallet } from '../api'
 import { onBalanceChanged } from '../balanceBus'
 import BrandWord from './BrandWord'
 
-type NavPage = 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed'
+type NavPage = 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed' | 'about'
 
 interface Props {
   active: NavPage
@@ -99,6 +99,16 @@ function ContributedIcon() {
   )
 }
 
+function AboutIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 11v5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="7.8" r="1.1" fill="currentColor" />
+    </svg>
+  )
+}
+
 export default function Sidebar({ active, email, token, onNavigate, onLogout }: Props) {
   const initial = (email || '?').trim().charAt(0).toUpperCase()
   const [balanceCents, setBalanceCents] = useState<number | undefined>(undefined)
@@ -170,6 +180,13 @@ export default function Sidebar({ active, email, token, onNavigate, onLogout }: 
         >
           <PlatformIcon />
           <span className="side-label">Platform Volume</span>
+        </button>
+        <button
+          className={`side-item${active === 'about' ? ' side-item-active' : ''}`}
+          onClick={() => onNavigate('about')}
+        >
+          <AboutIcon />
+          <span className="side-label">About Platform</span>
         </button>
         <button
           className={`side-item${active === 'wallet' ? ' side-item-active' : ''}`}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { A2uiSurface, A2uiComponent } from '../api'
+import Icon, { type IconName } from './Icon'
 
 interface Props {
   surfaces: A2uiSurface[]
@@ -132,12 +133,12 @@ export default function A2uiRenderer({ surfaces, onEvent, disabled, loading }: P
         return <hr key={id} className="a2ui-divider" style={inlineStyle} />
 
       case 'Icon': {
-        const iconMap: Record<string, string> = {
-          person: '👤', check: '✓', star: '★', doc: '📄', lock: '🔒', warning: '⚠️',
+        const iconMap: Record<string, IconName> = {
+          person: 'user', check: 'check', star: 'star', doc: 'doc', lock: 'lock', warning: 'warning',
         }
         return (
           <span key={id} className="a2ui-icon" style={inlineStyle}>
-            {iconMap[comp.name ?? ''] ?? '●'}
+            <Icon name={iconMap[comp.name ?? ''] ?? 'dot'} size={18} />
           </span>
         )
       }
