@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from app.db import init_db
+from app.db import get_conn, init_db
 
 init_db()
 
@@ -224,6 +224,60 @@ def create_skill_endpoint(body: dict) -> dict:
         "owner_account": listed.owner_account,
         "match_keywords": listed.match_keywords,
     }
+
+
+@app.get("/skills/contributed")
+def contributed_skills(token: str) -> dict:
+    """Every skill the authenticated caller has listed to the marketplace —
+    whether it's their own custom upload (/skills/create) or a promoted
+    owned-skill listing — plus per-skill hire count and lifetime earnings.
+
+    Sourced from the live registry (owner_id == caller), NOT the skill_ownership
+    table alone: pre-seeded owner-namespaced fixtures (e.g. the demo listings
+    under agent-skills/<owner_id>/) are registered straight from disk at
+    startup and never call list_skill(), so they'd have no skill_ownership row.
+    listed_at is filled in opportunistically where that row does exist.
+    """
+    from app.auth import _get_user_from_token
+    from app.marketplace.seed import seed_catalog
+    from app.marketplace.skill_registry import get_registry
+    from app import wallet as wallet_ops
+
+    user = _get_user_from_token(token)  # 401s on a bad/expired token
+    seed_catalog()  # idempotent — ensures the registry is populated
+
+    cards = [c for c in get_registry().list_cards() if c.owner_id == user["id"]]
+    earnings = wallet_ops.get_skill_earnings(user["id"])
+
+    conn = get_conn()
+    try:
+        listed_at_by_skill = {
+            r["skill_id"]: r["listed_at"]
+            for r in conn.execute(
+                "SELECT skill_id, listed_at FROM skill_ownership WHERE owner_id=?", (user["id"],)
+            ).fetchall()
+        }
+    finally:
+        conn.close()
+
+    skills = [
+        {
+            "skill_id": c.skill_id,
+            "agent_name": c.agent_name,
+            "display_name": c.display_name,
+            "description": c.description,
+            "match_keywords": c.match_keywords,
+            "currency": c.pricing.currency,
+            "base_fee_cents": c.pricing.base_fee_cents,
+            "completion_fee_cents": c.pricing.completion_fee_cents,
+            "listed_at": listed_at_by_skill.get(c.skill_id),
+            "hires": earnings.get(c.skill_id, {}).get("hires", 0),
+            "earned_cents": earnings.get(c.skill_id, {}).get("earned_cents", 0),
+        }
+        for c in cards
+    ]
+    skills.sort(key=lambda s: s["earned_cents"], reverse=True)
+    return {"skills": skills, "count": len(skills)}
 
 
 @app.get("/platform/stats")

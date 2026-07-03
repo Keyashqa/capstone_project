@@ -165,6 +165,44 @@ async def test_odd_completion_155_no_leak():
     assert wallet.get_all_account_sum() == 0
 
 
+def test_owner_account_for_is_the_owners_spendable_wallet():
+    """Production listing (app.marketplace.listing.owner_account_for) now routes
+    earnings into the owner's OWN <user_id> wallet — the same account top-ups
+    and hires use — not a separate non-spendable account."""
+    from app.marketplace.listing import owner_account_for
+
+    assert owner_account_for("alice") == "alice"
+
+
+async def test_listed_pass_deposits_into_owner_real_wallet():
+    """End-to-end with the PRODUCTION owner_account shape: earnings must show up
+    in the same account get_balance()/get_transactions() use for a normal
+    wallet — i.e. immediately spendable, immediately visible in MPay."""
+    from app.marketplace.listing import owner_account_for
+
+    buyer, owner_id, task_id = _uid("buyer"), _uid("alice"), _uid("t")
+    owner_account = owner_account_for(owner_id)
+    assert owner_account == owner_id  # sanity: no separate account minted
+
+    owner_before = await wallet.get_balance(owner_id)
+    await _fund_escrow(buyer, task_id, 250)  # base 100 + completion 150
+    await pay_completion({"task_id": task_id, "skill_card": _skill_card(owner_account, 100, 150, owner_id=owner_id)})
+
+    # The owner's ordinary spendable wallet grew — no cash-out step needed.
+    assert await wallet.get_balance(owner_id) - owner_before == 235
+    assert await get_escrow_balance(task_id) == 0
+    assert wallet.get_all_account_sum() == 0
+
+    txns = wallet.get_transactions(owner_id, limit=5)
+    assert any(t["reason"] == REASON_OWNER and t["delta_cents"] == 235 for t in txns)
+
+    # get_platform_stats still finds this owner's earnings (grouped by `reason`
+    # now, not by an 'agent:owner:%' account prefix that no longer exists).
+    stats = wallet.get_platform_stats()
+    owners = {o["owner_id"]: o["earned_cents"] for o in stats["per_owner"]}
+    assert owners[owner_id] == 235
+
+
 async def test_platform_stats_separates_owner_broker_specialist():
     """get_platform_stats groups owner earnings, broker revenue, and legacy
     specialist earnings into DISTINCT buckets (plan3.md §P3-8)."""
@@ -192,8 +230,12 @@ async def test_platform_stats_separates_owner_broker_specialist():
 
 
 async def test_self_hire_nets_minus_commission():
-    """buyer == owner: spendable wallet pays in, earnings land in the SEPARATE
-    agent:owner:<id> account, broker skims 10% — a real -10% move, not a wash."""
+    """buyer == owner, using an owner_account DISTINCT from the principal's own
+    wallet id (exercises compute_split's generality — it never assumes
+    owner_account == owner_id): spendable wallet pays in, earnings land in the
+    distinct account, broker skims 10% — a real -10% move, not a wash. In
+    PRODUCTION owner_account == owner_id (see test_owner_account_for_is_the_owners_spendable_wallet),
+    so a real self-hire nets the same -10% but through the SAME wallet."""
     principal, task_id = _uid("self"), _uid("t")
     owner_account = f"agent:owner:{principal}"
     await _fund_escrow(principal, task_id, 250)  # principal's spendable wallet → escrow

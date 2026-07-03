@@ -5,8 +5,8 @@ import { apiGetOwnedSkills, type OwnedSkill } from '../api'
 
 interface Props {
   email: string
-  balanceCents: number
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell') => void
+  token: string
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed') => void
   onLogout: () => void
 }
 
@@ -19,7 +19,7 @@ const accentFor = (seed: string) => {
   return OWNED_ACCENTS[h % OWNED_ACCENTS.length]
 }
 
-export default function OwnedSkills({ email, balanceCents, onNavigate, onLogout }: Props) {
+export default function OwnedSkills({ email, token, onNavigate, onLogout }: Props) {
   const [skills, setSkills] = useState<OwnedSkill[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -37,7 +37,7 @@ export default function OwnedSkills({ email, balanceCents, onNavigate, onLogout 
       <Sidebar
         active="owned-skills"
         email={email}
-        balanceCents={balanceCents}
+        token={token}
         onNavigate={onNavigate}
         onLogout={onLogout}
       />
@@ -48,17 +48,12 @@ export default function OwnedSkills({ email, balanceCents, onNavigate, onLogout 
             <div className="market-hero-top">
               <div>
                 <span className="eyebrow">Owned Skills</span>
-                <h1>Specialists Marvis built for itself</h1>
-                <p className="market-hero-sub">
-                  When no marketplace skill covers a request, Marvis commissions a new
-                  specialist ONCE, then owns it outright. Owned skills never appear in the
-                  marketplace, are never re-hired, and run <b>free forever</b> after that.
-                </p>
+                <h1>Skills Marvis built for itself</h1>
               </div>
               <div className="market-stats">
                 <div className="market-stat">
                   <div className="market-stat-num">{loading ? '—' : skills.length}</div>
-                  <div className="market-stat-label">Owned</div>
+                  <div className="market-stat-label">Total Owned</div>
                 </div>
               </div>
             </div>
@@ -80,7 +75,7 @@ export default function OwnedSkills({ email, balanceCents, onNavigate, onLogout 
                 const accent = accentFor(s.agent_name)
                 return (
                   <button
-                    className="owned-card"
+                    className="owned-card glass-accent"
                     key={s.skill_id}
                     style={{ ['--accent' as any]: accent }}
                     onClick={() => setSelected(s)}
@@ -91,14 +86,11 @@ export default function OwnedSkills({ email, balanceCents, onNavigate, onLogout 
                       </div>
                       <div className="owned-id">
                         <div className="owned-name">{s.display_name}</div>
-                        <div className="owned-handle">@{s.agent_name}</div>
                       </div>
-                      <span className="owned-badge">Owned · Free</span>
                     </div>
                     <p className="owned-desc">{s.description}</p>
                     <div className="owned-foot">
-                      <span className="owned-tag-count">{s.specialties.length} specialties</span>
-                      <span className="owned-expand-hint">Tap for details →</span>
+                      <span className="owned-price-mini">Free</span>
                     </div>
                   </button>
                 )
@@ -117,18 +109,22 @@ export default function OwnedSkills({ email, balanceCents, onNavigate, onLogout 
               </div>
               <div>
                 <div className="owned-detail-name">{selected.display_name}</div>
-                <div className="owned-handle">@{selected.agent_name} · v{selected.version}</div>
               </div>
               <span className="owned-badge">Owned · Free</span>
             </div>
 
             <p className="owned-detail-desc">{selected.description}</p>
 
-            <div className="owned-detail-tags">
-              {selected.specialties.map(sp => (
-                <span className="agent-tag" key={sp}>{sp}</span>
-              ))}
-            </div>
+            {selected.specialties.length > 0 && (
+              <div className="owned-detail-tags">
+                {selected.specialties.slice(0, 6).map(sp => (
+                  <span className="agent-tag" key={sp}>{sp}</span>
+                ))}
+                {selected.specialties.length > 6 && (
+                  <span className="owned-tag-count">+{selected.specialties.length - 6} more</span>
+                )}
+              </div>
+            )}
 
             <div className="agent-cap owned-detail-cap">
               <span className="agent-cap-icon">🔒</span>
@@ -150,8 +146,7 @@ export default function OwnedSkills({ email, balanceCents, onNavigate, onLogout 
               <pre>{selected.instruction}</pre>
             </div>
 
-            <div className="owned-detail-foot">
-              <span className="agent-model">⚡ {selected.model.replace('ollama/', '')}</span>
+            <div className="owned-detail-foot" style={{ justifyContent: 'flex-end' }}>
               <button className="agent-hire" onClick={() => onNavigate('chat')}>
                 Use via Chat
               </button>

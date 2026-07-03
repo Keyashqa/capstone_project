@@ -1,4 +1,5 @@
 import { BrandMark } from '../components/Sidebar'
+import BrandWord from '../components/BrandWord'
 
 interface Props {
   onGetStarted: () => void
@@ -6,9 +7,7 @@ interface Props {
 }
 
 function MPayWordmark() {
-  return (
-    <span className="mpay-tag"><span className="mpay-tag-m">M</span>Pay</span>
-  )
+  return <BrandWord text="MPay" />
 }
 
 const FEATURES = [
@@ -19,8 +18,8 @@ const FEATURES = [
   },
   {
     icon: '🧑‍🚀',
-    title: 'Marvis hires the right agent',
-    body: 'From a live marketplace of specialist agents — writers, researchers, doc builders — Marvis picks the best fit for the job.',
+    title: 'Marvis hires the right skill',
+    body: 'From a live marketplace of skills — writers, researchers, doc builders — Marvis picks the best fit for the job.',
   },
   {
     icon: '✅',
@@ -31,8 +30,8 @@ const FEATURES = [
 
 const STEPS = [
   { n: 1, title: 'Tell Marvis what you need', body: '“Write a launch tweet and save it to Google Docs.”' },
-  { n: 2, title: 'Marvis hires a specialist', body: 'It selects and briefs the right agent from the marketplace.' },
-  { n: 3, title: 'The agent does the work', body: 'The task runs with only the permissions it actually needs.' },
+  { n: 2, title: 'Marvis hires a skill', body: 'It selects and briefs the right skill from the marketplace.' },
+  { n: 3, title: 'The skill does the work', body: 'The task runs with only the permissions it actually needs.' },
   { n: 4, title: 'Verify, then pay with MPay', body: 'Marvis checks the result and releases payment on your OK.' },
 ]
 
@@ -40,8 +39,8 @@ const MPAY_FLOW = [
   { icon: '💰', title: 'Top up', body: 'Add funds to your MPay wallet.', tag: 'MPay' },
   { icon: '🛒', title: 'Hire & quote', body: 'Marvis gets a signed CartMandate — a tamper-proof quote — from the marketplace.', tag: 'UCP' },
   { icon: '🔒', title: 'Authorize & escrow', body: 'Your PIN signs a PaymentMandate (SD-JWT); MPay locks the funds in escrow.', tag: 'AP2' },
-  { icon: '⚙️', title: 'Work & verify', body: 'The hired agent does the job; Marvis verifies the result.', tag: null },
-  { icon: '🤝', title: 'Settle', body: 'Passes → agent is paid. Fails → you’re refunded.', tag: 'MPay' },
+  { icon: '⚙️', title: 'Work & verify', body: 'The hired skill does the job; Marvis verifies the result.', tag: null },
+  { icon: '🤝', title: 'Settle', body: 'Passes → the skill is paid. Fails → you’re refunded.', tag: 'MPay' },
 ]
 
 const PROTOCOLS = [
@@ -50,7 +49,7 @@ const PROTOCOLS = [
     cls: 'ucp',
     name: 'Universal Commerce Protocol',
     body:
-      'The marketplace layer. Built on MCP, UCP is how Marvis discovers specialist agents and hires them. ' +
+      'The marketplace layer. Built on MCP, UCP is how Marvis discovers skills and hires them. ' +
       'Before any work starts, the broker returns a signed CartMandate — a tamper-proof quote describing exactly ' +
       'what you’ll get and what it costs.',
   },
@@ -69,7 +68,7 @@ const STACK = [
   { label: 'Marvis', sub: 'Orchestration — the agent you talk to', cls: 'stack-marvis' },
   { label: 'MPay', sub: 'Wallet & settlement — what you see', cls: 'stack-mpay' },
   { label: 'AP2', sub: 'Payment authorization — signed mandates', cls: 'stack-ap2' },
-  { label: 'UCP', sub: 'Agent marketplace & checkout', cls: 'stack-ucp' },
+  { label: 'UCP', sub: 'Skill marketplace & checkout', cls: 'stack-ucp' },
   { label: 'MCP', sub: 'Secure tool transport', cls: 'stack-mcp' },
 ]
 
@@ -81,7 +80,7 @@ export default function Landing({ onGetStarted, onSignIn }: Props) {
         <div className="landing-nav-inner">
           <div className="brand">
             <BrandMark />
-            <span className="brand-name">Marvis</span>
+            <span className="brand-name"><BrandWord text="Marvis" /></span>
           </div>
           <div className="landing-nav-actions">
             <button className="nav-ghost" onClick={onSignIn}>Sign in</button>
@@ -96,7 +95,7 @@ export default function Landing({ onGetStarted, onSignIn }: Props) {
           <span className="hero-badge">✦ Your personal AI orchestrator</span>
           <h1>Tell Marvis what you need.<br />It gets it done.</h1>
           <p className="hero-sub">
-            Marvis hires specialist AI agents, coordinates the work, and pays them
+            Marvis hires the right skill, coordinates the work, and pays for it
             securely through <MPayWordmark /> — only when the job is verified. You just describe the goal.
           </p>
           <div className="hero-cta">
@@ -150,8 +149,8 @@ export default function Landing({ onGetStarted, onSignIn }: Props) {
           <span className="eyebrow">What is Marvis</span>
           <h2>An orchestrator, not just another chatbot</h2>
           <p className="section-sub">
-            Marvis is the layer between you and a marketplace of AI agents. It understands your goal,
-            hires the right specialist, supervises the work, and settles payment — all in one conversation.
+            Marvis is the layer between you and a marketplace of skills. It understands your goal,
+            hires the right skill, supervises the work, and settles payment — all in one conversation.
           </p>
         </div>
         <div className="feature-grid">
@@ -189,7 +188,7 @@ export default function Landing({ onGetStarted, onSignIn }: Props) {
       <section className="section mpay-section" id="mpay">
         <div className="section-head">
           <span className="eyebrow">Payments, handled</span>
-          <h2>Meet <MPayWordmark /> — payments agents can trust</h2>
+          <h2>Meet <MPayWordmark /> — payments you can trust</h2>
           <p className="section-sub">
             <MPayWordmark /> is the wallet and settlement layer built into Marvis. Under the hood it runs on the
             open <b>AP2</b> payment protocol and a double-entry ledger — so money only moves when the work is
@@ -265,7 +264,7 @@ export default function Landing({ onGetStarted, onSignIn }: Props) {
       <footer className="landing-footer">
         <div className="brand">
           <BrandMark size={22} />
-          <span className="brand-name">Marvis</span>
+          <span className="brand-name"><BrandWord text="Marvis" /></span>
         </div>
         <span className="footer-note">Marvis · powered by <MPayWordmark /> · a capstone project</span>
       </footer>

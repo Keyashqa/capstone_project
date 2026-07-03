@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import Sidebar from '../components/Sidebar'
+import BrandWord from '../components/BrandWord'
+import Modal from '../components/Modal'
 import { apiGetAgents, type MarketAgent } from '../api'
 
 interface Props {
   email: string
-  balanceCents: number
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell') => void
+  token: string
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed') => void
   onLogout: () => void
 }
 
@@ -20,18 +22,19 @@ const look = (name: string) =>
   AGENT_LOOKS[name] ?? { emoji: '🤖', accent: '#6B3FD4' }
 
 const STORYBOARD = [
-  { icon: '🛍️', title: 'Browse specialists' },
+  { icon: '🛍️', title: 'Browse skills' },
   { icon: '💬', title: 'Describe your task' },
   { icon: '🤝', title: 'Marvis hires the match' },
   { icon: '✅', title: 'Pay on delivery' },
 ]
 
-export default function Marketplace({ email, balanceCents, onNavigate, onLogout }: Props) {
+export default function Marketplace({ email, token, onNavigate, onLogout }: Props) {
   const [agents, setAgents] = useState<MarketAgent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
   const [specialty, setSpecialty] = useState<string | null>(null)
+  const [selected, setSelected] = useState<MarketAgent | null>(null)
 
   useEffect(() => {
     apiGetAgents()
@@ -41,9 +44,13 @@ export default function Marketplace({ email, balanceCents, onNavigate, onLogout 
   }, [])
 
   const specialties = useMemo(() => {
-    const s = new Set<string>()
-    agents.forEach(a => a.specialties.forEach(x => s.add(x)))
-    return Array.from(s).sort()
+    const counts = new Map<string, number>()
+    agents.forEach(a => a.specialties.forEach(x => counts.set(x, (counts.get(x) ?? 0) + 1)))
+    // Most common first, capped — a wall of 20 filter chips isn't a filter, it's noise.
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 6)
+      .map(([name]) => name)
   }, [agents])
 
   const filtered = useMemo(() => {
@@ -65,7 +72,7 @@ export default function Marketplace({ email, balanceCents, onNavigate, onLogout 
       <Sidebar
         active="marketplace"
         email={email}
-        balanceCents={balanceCents}
+        token={token}
         onNavigate={onNavigate}
         onLogout={onLogout}
       />
@@ -76,18 +83,13 @@ export default function Marketplace({ email, balanceCents, onNavigate, onLogout 
           <div className="market-hero">
             <div className="market-hero-top">
               <div>
-                <span className="eyebrow">Agent Marketplace</span>
-                <h1>Specialists, ready to be hired</h1>
-                <p className="market-hero-sub">
-                  Browse the agents Marvis can put to work for you. Each one is scoped to
-                  least-privilege access, priced upfront, and paid through <b>MPay</b> only after its
-                  deliverable passes verification.
-                </p>
+                <span className="eyebrow">Skills <BrandWord text="Marketplace" /></span>
+                <h1>Skills, ready to be hired</h1>
               </div>
               <div className="market-stats">
                 <div className="market-stat">
                   <div className="market-stat-num">{loading ? '—' : agents.length}</div>
-                  <div className="market-stat-label">Agents</div>
+                  <div className="market-stat-label">Total Skills</div>
                 </div>
               </div>
             </div>
@@ -146,74 +148,100 @@ export default function Marketplace({ email, balanceCents, onNavigate, onLogout 
           ) : error ? (
             <div className="market-note market-note-error">{error}</div>
           ) : filtered.length === 0 ? (
-            <div className="market-note">No agents match your search.</div>
+            <div className="market-note">No skills match your search.</div>
           ) : (
-            <div className="agent-grid">
+            <div className="owned-grid">
               {filtered.map(a => {
                 const { emoji, accent } = look(a.agent_name)
                 const total = a.base_fee_cents + a.completion_fee_cents
                 return (
-                  <div className="agent-card" key={a.skill_id} style={{ ['--accent' as any]: accent }}>
-                    <div className="agent-card-top">
-                      <div className="agent-avatar" style={{ background: accent }}>{emoji}</div>
-                      <div className="agent-id">
-                        <div className="agent-name">
-                          {a.display_name}
-                          <span className="agent-verified" title="Cryptographically verified identity">✓</span>
-                        </div>
-                        <div className="agent-handle">@{a.agent_name}</div>
-                      </div>
-                      <div className="agent-rep" title="New to the marketplace">★ New</div>
-                    </div>
-
-                    <p className="agent-desc">{a.description}</p>
-
-                    <div className="agent-tags">
-                      {a.specialties.slice(0, 4).map(s => (
-                        <span className="agent-tag" key={s}>{s}</span>
-                      ))}
-                    </div>
-
-                    <div className="agent-cap">
-                      <span className="agent-cap-icon">🔒</span>
-                      <div>
-                        <div className="agent-cap-title">Scoped capability</div>
-                        {a.capabilities.map(c => (
-                          <div className="agent-cap-tool" key={c.tool_name}>
-                            <code>{c.mcp_server}.{c.tool_name}</code> — {c.why}
-                          </div>
-                        ))}
+                  <button
+                    className="owned-card glass-accent"
+                    key={a.skill_id}
+                    style={{ ['--accent' as any]: accent }}
+                    onClick={() => setSelected(a)}
+                  >
+                    <div className="owned-card-top">
+                      <div className="owned-avatar" style={{ background: accent }}>{emoji}</div>
+                      <div className="owned-id">
+                        <div className="owned-name">{a.display_name}</div>
                       </div>
                     </div>
-
-                    <div className="agent-pricing">
-                      <div className="price-line">
-                        <span>Base fee <em>(non-refundable)</em></span>
-                        <span>{fmt$(a.base_fee_cents)}</span>
-                      </div>
-                      <div className="price-line">
-                        <span>On delivery <em>(refundable)</em></span>
-                        <span>{fmt$(a.completion_fee_cents)}</span>
-                      </div>
-                      <div className="price-line price-total">
-                        <span>Total per task</span>
-                        <span>{fmt$(total)}</span>
-                      </div>
+                    <p className="owned-desc">{a.description}</p>
+                    <div className="owned-foot">
+                      <span className="owned-price-mini">{fmt$(total)} / task</span>
                     </div>
-
-                    <div className="agent-foot">
-                      <span className="agent-model">⚡ {a.model.replace('ollama/', '')}</span>
-                      <button className="agent-hire" onClick={() => onNavigate('chat')}>
-                        Hire via Chat
-                      </button>
-                    </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
           )}
         </main>
       </div>
+
+      {selected && (
+        <Modal onClose={() => setSelected(null)}>
+          <div className="owned-detail" style={{ ['--accent' as any]: look(selected.agent_name).accent }}>
+            <div className="owned-detail-top">
+              <div className="owned-avatar owned-avatar-lg" style={{ background: look(selected.agent_name).accent }}>
+                {look(selected.agent_name).emoji}
+              </div>
+              <div>
+                <div className="owned-detail-name">{selected.display_name}</div>
+              </div>
+            </div>
+
+            <p className="owned-detail-desc">{selected.description}</p>
+
+            {selected.specialties.length > 0 && (
+              <div className="owned-detail-tags">
+                {selected.specialties.slice(0, 6).map(sp => (
+                  <span className="agent-tag" key={sp}>{sp}</span>
+                ))}
+                {selected.specialties.length > 6 && (
+                  <span className="owned-tag-count">+{selected.specialties.length - 6} more</span>
+                )}
+              </div>
+            )}
+
+            <div className="agent-cap owned-detail-cap">
+              <span className="agent-cap-icon">🔒</span>
+              <div>
+                <div className="agent-cap-title">Scoped capability</div>
+                {selected.capabilities.map(c => (
+                  <div className="agent-cap-tool" key={c.tool_name}>
+                    <code>{c.mcp_server}.{c.tool_name}</code> — {c.why}
+                  </div>
+                ))}
+                {selected.capabilities.length === 0 && (
+                  <div className="agent-cap-tool">No MCP tool — this skill only generates text.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="agent-pricing">
+              <div className="price-line">
+                <span>Base fee <em>(non-refundable)</em></span>
+                <span>{fmt$(selected.base_fee_cents)}</span>
+              </div>
+              <div className="price-line">
+                <span>On delivery <em>(refundable)</em></span>
+                <span>{fmt$(selected.completion_fee_cents)}</span>
+              </div>
+              <div className="price-line price-total">
+                <span>Total per task</span>
+                <span>{fmt$(selected.base_fee_cents + selected.completion_fee_cents)}</span>
+              </div>
+            </div>
+
+            <div className="owned-detail-foot" style={{ justifyContent: 'flex-end' }}>
+              <button className="agent-hire" onClick={() => onNavigate('chat')}>
+                Hire via Chat
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

@@ -189,7 +189,7 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS skill_ownership (
             owner_id      TEXT NOT NULL,
             skill_id      TEXT NOT NULL,
-            owner_account TEXT,                         -- e.g. "agent:owner:<owner_id>"; NULL ⇒ unowned
+            owner_account TEXT,                         -- the owner's own spendable <user_id> wallet; NULL ⇒ unowned
             listed_at     TEXT NOT NULL DEFAULT (datetime('now')),
             PRIMARY KEY (owner_id, skill_id)
         )

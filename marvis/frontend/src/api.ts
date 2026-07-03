@@ -4,7 +4,6 @@ export interface AuthState {
   token: string
   userId: string
   email: string
-  balanceCents: number
 }
 
 export async function apiRegister(email: string, password: string, pin: string): Promise<AuthState> {
@@ -14,7 +13,7 @@ export async function apiRegister(email: string, password: string, pin: string):
   })
   if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Registration failed') }
   const d = await r.json()
-  return { token: d.token, userId: d.user_id, email: d.email, balanceCents: d.balance_cents }
+  return { token: d.token, userId: d.user_id, email: d.email }
 }
 
 export async function apiLogin(email: string, password: string): Promise<AuthState> {
@@ -24,7 +23,7 @@ export async function apiLogin(email: string, password: string): Promise<AuthSta
   })
   if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Login failed') }
   const d = await r.json()
-  return { token: d.token, userId: d.user_id, email: d.email, balanceCents: d.balance_cents }
+  return { token: d.token, userId: d.user_id, email: d.email }
 }
 
 export async function apiCreateAdkSession(token: string): Promise<string> {
@@ -40,12 +39,12 @@ export async function apiCreateAdkSession(token: string): Promise<string> {
 export async function apiVerifyPin(
   token: string,
   pin: string,
-  adkSessionId: string,
+  adkSessionId?: string,
   interruptId: string = 'payment_auth',
 ): Promise<boolean> {
   const r = await fetch(`${AGENT}/auth/verify-pin`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, pin, adk_session_id: adkSessionId, interrupt_id: interruptId }),
+    body: JSON.stringify({ token, pin, adk_session_id: adkSessionId ?? null, interrupt_id: interruptId }),
   })
   if (!r.ok) return false
   const d = await r.json()
@@ -115,6 +114,27 @@ export interface CreatedSkill {
   owner_id: string
   owner_account: string
   match_keywords: string[]
+}
+
+export interface ContributedSkill {
+  skill_id: string
+  agent_name: string
+  display_name: string
+  description: string
+  match_keywords: string[]
+  currency: string
+  base_fee_cents: number
+  completion_fee_cents: number
+  listed_at: string | null
+  hires: number
+  earned_cents: number
+}
+
+export async function apiGetContributedSkills(token: string): Promise<ContributedSkill[]> {
+  const r = await fetch(`${AGENT}/skills/contributed?token=${encodeURIComponent(token)}`)
+  if (!r.ok) throw new Error('Failed to load contributed skills')
+  const d = await r.json()
+  return d.skills as ContributedSkill[]
 }
 
 export async function apiCreateSkill(token: string, input: CreateSkillInput): Promise<CreatedSkill> {

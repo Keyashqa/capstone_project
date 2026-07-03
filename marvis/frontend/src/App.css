@@ -640,14 +640,14 @@ section h3 {
 .a2ui-btn:disabled { opacity: .45; cursor: not-allowed; }
 .a2ui-btn .a2ui-body { color: inherit; font-size: inherit; font-weight: inherit; }
 
-/* ── MPay wordmark ───────────────────────────────────────── */
-.mpay-tag { font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
-.mpay-tag-m {
+/* ── Brand wordmark — highlights the leading "M" (Marvis, MPay, Marketplace…) ── */
+.brand-word { font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+.brand-word-m {
   display: inline-block;
   color: var(--green-mid);
 }
-.balance-label .mpay-tag { color: #fff; }
-.balance-label .mpay-tag-m { color: #B7F5C9; }
+.balance-label .brand-word { color: #fff; }
+.balance-label .brand-word-m { color: #B7F5C9; }
 
 /* ── Auth back link ──────────────────────────────────────── */
 .auth-back {
@@ -903,8 +903,8 @@ section h3 {
 .cta-band p { font-size: 1.05rem; color: rgba(255,255,255,.85); margin: 0 auto 1.75rem; max-width: 46ch; }
 .cta-band .btn-hero { background: #fff; color: var(--primary); box-shadow: 0 6px 20px rgba(0,0,0,.18); }
 .cta-band .btn-hero:hover { background: #F1F5FB; }
-.cta-band .mpay-tag { color: #fff; }
-.cta-band .mpay-tag-m { color: #B7F5C9; }
+.cta-band .brand-word { color: #fff; }
+.cta-band .brand-word-m { color: #B7F5C9; }
 
 /* Footer */
 .landing-footer {
@@ -978,41 +978,34 @@ section h3 {
 .market-note { text-align: center; color: var(--text-faint); padding: 3rem 1rem; font-size: .95rem; }
 .market-note-error { color: var(--red); }
 
-/* Agent cards */
-.agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.25rem; }
-.agent-card {
-  --accent: var(--primary);
-  background: var(--surface);
-  border: 1px solid var(--border-light);
-  border-top: 3px solid var(--accent);
-  border-radius: var(--r-lg);
-  padding: 1.4rem;
-  box-shadow: var(--shadow-sm);
-  display: flex; flex-direction: column;
-  transition: transform .15s, box-shadow .15s;
+/* ── Minimal cards, click to expand (owned-card layout) — used by Marketplace
+   AND Owned Skills for a consistent look. Frosted "glass" accent ring,
+   replacing a flat solid top bar. --accent is set per-card inline; the ring
+   is a gradient-masked pseudo-border so it reads as a soft halo rather than
+   one hard-edged color block. */
+.glass-accent {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.78));
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,.6);
+  box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 8px 24px -14px rgba(16,24,40,.16);
 }
-.agent-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
-.agent-card-top { display: flex; align-items: center; gap: .75rem; }
-.agent-avatar {
-  width: 46px; height: 46px; flex-shrink: 0;
-  border-radius: var(--r-md);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.4rem; box-shadow: var(--shadow-sm);
+.glass-accent::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, var(--accent), transparent 65%);
+  opacity: .5;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  transition: opacity .15s;
 }
-.agent-id { flex: 1; min-width: 0; }
-.agent-name { font-size: 1.08rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: .4rem; }
-.agent-verified {
-  width: 16px; height: 16px; border-radius: 50%;
-  background: var(--primary); color: #fff; font-size: .62rem; font-weight: 800;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.agent-handle { font-size: .8rem; color: var(--text-faint); font-weight: 500; }
-.agent-rep {
-  font-size: .72rem; font-weight: 700; color: var(--gold);
-  background: var(--gold-bg); border: 1px solid var(--gold-border);
-  padding: .2rem .5rem; border-radius: var(--r-pill); flex-shrink: 0;
-}
-.agent-desc { font-size: .88rem; line-height: 1.55; color: var(--text-muted); margin: 1rem 0 .85rem; }
+.glass-accent:hover::before { opacity: .85; }
+.owned-price-mini { color: var(--text-muted); font-weight: 700; font-size: .78rem; }
+
 .agent-tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: 1rem; }
 .agent-tag {
   font-size: .72rem; font-weight: 600; color: var(--primary);
@@ -1034,8 +1027,6 @@ section h3 {
 .price-total { margin-top: .3rem; padding-top: .5rem; border-top: 1px solid var(--border-light); font-weight: 800; color: var(--text); font-size: .95rem; }
 .price-total span:last-child { color: var(--green); }
 
-.agent-foot { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: 1.1rem; }
-.agent-model { font-size: .74rem; font-weight: 600; color: var(--text-faint); }
 .agent-hire {
   background: var(--primary); color: #fff; border: none;
   font-size: .86rem; font-weight: 700;
@@ -1044,9 +1035,69 @@ section h3 {
 }
 .agent-hire:hover { background: var(--primary-dark); }
 
-/* ── Platform Volume (cross-user ledger dashboard) ───────────────────── */
-.platform-stats-row { margin: 0 0 2rem; flex-wrap: wrap; }
-.platform-stats-row .market-stat { flex: 1; min-width: 130px; }
+/* ── Platform Volume — GPay-style KPI tiles + two lightweight charts ─────── */
+.gpay-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .85rem; margin: 0 0 1.5rem; }
+.gpay-stat-tile {
+  display: flex; align-items: center; gap: .75rem;
+  background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--r-lg);
+  padding: 1rem 1.1rem; box-shadow: var(--shadow-xs);
+}
+.gpay-stat-icon {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 1.15rem;
+}
+.gpay-stat-num { font-size: 1.3rem; font-weight: 800; color: var(--text); line-height: 1.2; }
+.gpay-stat-label { font-size: .74rem; font-weight: 600; color: var(--text-faint); }
+
+.viz-card {
+  background: var(--surface); border: 1px solid var(--border-light); border-radius: var(--r-lg);
+  padding: 1.5rem; box-shadow: var(--shadow-xs); margin-bottom: 1.5rem;
+}
+.viz-card-title { font-size: .95rem; font-weight: 700; color: var(--text); margin: 0 0 .2rem; }
+.viz-card-sub { font-size: .78rem; color: var(--text-faint); margin: 0 0 1.25rem; }
+
+/* Part-to-whole "where the money goes" bar — 1-4 segments, direct-labeled.
+   Corners are rounded on the end segments only (not overflow:hidden on the
+   row) so a hover tooltip on any segment isn't clipped by the pill shape. */
+.flow-bar { display: flex; width: 100%; height: 14px; border-radius: 999px; background: var(--surface-sunken); gap: 2px; }
+.flow-bar-seg { height: 100%; min-width: 3px; cursor: default; }
+.flow-bar-seg:first-child { border-top-left-radius: 999px; border-bottom-left-radius: 999px; }
+.flow-bar-seg:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
+.flow-legend { display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; margin-top: 1.1rem; }
+.flow-legend-item { display: flex; align-items: center; gap: .5rem; font-size: .82rem; }
+.flow-legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.flow-legend-label { color: var(--text-muted); }
+.flow-legend-value { font-weight: 700; color: var(--text); }
+.flow-legend-pct { color: var(--text-faint); font-size: .76rem; }
+
+/* Hiring-activity trend — sequential magnitude, one hue, position (x) carries time */
+.trend-chart { display: flex; align-items: flex-end; gap: 6px; height: 140px; }
+.trend-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; min-width: 6px; }
+.trend-bar {
+  width: 100%; max-width: 28px; background: var(--primary); border-radius: 4px 4px 0 0;
+  min-height: 3px; cursor: default;
+  transition: background-color .12s;
+}
+.trend-bar:hover, .trend-bar:focus-visible { background: var(--primary-dark); outline: none; }
+.trend-bar-axis { font-size: .66rem; color: var(--text-faint); margin-top: .5rem; text-align: center; white-space: nowrap; }
+
+/* Lightweight CSS-only hover/focus tooltip, shared by chart marks */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  background: var(--text); color: #fff; font-size: .72rem; font-weight: 600;
+  padding: .4rem .6rem; border-radius: 8px; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity .12s;
+  box-shadow: var(--shadow-md); z-index: 5;
+}
+[data-tip]::before {
+  content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%; transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: var(--text);
+  opacity: 0; pointer-events: none; transition: opacity .12s;
+}
+[data-tip]:hover::after, [data-tip]:hover::before,
+[data-tip]:focus-visible::after, [data-tip]:focus-visible::before { opacity: 1; }
 
 /* ── Owned Skills (concise cards + detail modal) ─────────────────────── */
 .owned-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
@@ -1078,7 +1129,6 @@ section h3 {
 }
 .owned-foot { display: flex; align-items: center; justify-content: space-between; margin-top: auto; font-size: .74rem; }
 .owned-tag-count { color: var(--text-faint); font-weight: 600; }
-.owned-expand-hint { color: var(--primary); font-weight: 700; }
 
 /* ── Modal (generic popup, reused for owned-skill detail) ────────────── */
 .modal-overlay {
@@ -1097,6 +1147,64 @@ section h3 {
   font-size: .85rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
 .modal-close:hover { background: var(--border-light); color: var(--text); }
+
+/* ── Add money — simulated bank transfer flow ─────────────────────────── */
+.addmoney-title { font-size: 1.15rem; font-weight: 800; color: var(--text); margin: 0 0 1.1rem; }
+.bank-card {
+  display: flex; align-items: center; gap: .8rem;
+  background: var(--surface-sunken); border: 1px solid var(--border-light); border-radius: var(--r-md);
+  padding: .85rem 1rem; margin-bottom: 1.25rem;
+}
+.bank-icon {
+  width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+  background: var(--primary-light); color: var(--primary);
+  display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+}
+.bank-id { flex: 1; min-width: 0; }
+.bank-name { font-size: .88rem; font-weight: 700; color: var(--text); }
+.bank-mask { font-size: .76rem; color: var(--text-faint); }
+.bank-linked-badge {
+  font-size: .66rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--green); background: var(--green-bg); border-radius: var(--r-pill);
+  padding: .22rem .55rem; flex-shrink: 0;
+}
+
+.amount-picker { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.amount-chip {
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--text-2);
+  font: inherit; font-weight: 700; font-size: .9rem;
+  padding: .55rem 1.1rem; border-radius: var(--r-pill); cursor: pointer;
+  transition: border-color .15s, color .15s, background-color .15s;
+}
+.amount-chip:hover { border-color: var(--primary); color: var(--primary); }
+.amount-chip-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.pin-input {
+  width: 100%; max-width: 220px; margin: 0 auto; display: block;
+  text-align: center; font-size: 1.5rem; font-weight: 700; letter-spacing: .55em;
+  padding: .7rem .5rem .7rem .9rem;
+}
+
+.transfer-summary { display: grid; gap: .65rem; margin: 1.1rem 0 1.4rem; }
+.transfer-summary-row { display: flex; justify-content: space-between; align-items: center; font-size: .88rem; }
+.transfer-summary-row span:first-child { color: var(--text-faint); }
+.transfer-summary-row span:last-child { color: var(--text); font-weight: 600; }
+.transfer-summary-amount { font-size: 1.6rem; font-weight: 800; color: var(--text); text-align: center; margin: .3rem 0 1.1rem; }
+
+.transfer-status { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 1.5rem 0; gap: .9rem; }
+.transfer-spinner {
+  width: 40px; height: 40px; border-radius: 50%;
+  border: 3px solid var(--primary-light); border-top-color: var(--primary);
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.transfer-status-text { font-size: .9rem; color: var(--text-muted); font-weight: 600; }
+.transfer-success-icon {
+  width: 52px; height: 52px; border-radius: 50%; background: var(--green-bg); color: var(--green);
+  display: flex; align-items: center; justify-content: center; font-size: 1.6rem;
+}
+.transfer-success-amount { font-size: 1.7rem; font-weight: 800; color: var(--text); }
+.transfer-error { color: var(--red); font-size: .82rem; text-align: center; margin: -.4rem 0 1rem; font-weight: 600; }
 
 .owned-detail-top { display: flex; align-items: center; gap: .85rem; padding-right: 2rem; }
 .owned-detail-name { font-size: 1.15rem; font-weight: 800; color: var(--text); }
@@ -1153,20 +1261,57 @@ section h3 {
   .flow-node { width: 100%; max-width: 320px; }
 }
 
-/* ── Sell a Skill form (Phase 3) ───────────────────────────────────────────── */
-.sell-form { margin-top: 8px; }
+/* ── Contribute a Skill form (Phase 3) — a restrained pinch of glassmorphism ──
+   Frosted panels (blur + translucency + soft inner highlight), inset-shadow
+   inputs with a soft focus glow, and a sticky summary card — the same visual
+   language as Apple's System Settings detail panes, kept subtle. */
+.glass-panel {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,.86), rgba(255,255,255,.66));
+  backdrop-filter: blur(16px) saturate(1.5);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: var(--r-xl);
+  box-shadow: 0 1px 1px rgba(16,24,40,.04), 0 16px 40px -20px rgba(16,24,40,.22),
+              inset 0 1px 0 rgba(255,255,255,.65);
+  padding: 1.75rem;
+}
+
+.contribute-layout { display: grid; grid-template-columns: 1fr 320px; gap: 1.5rem; align-items: start; margin-top: 1.25rem; }
+@media (max-width: 880px) { .contribute-layout { grid-template-columns: 1fr; } }
+
+.contribute-summary { position: sticky; top: 1.5rem; display: flex; flex-direction: column; gap: 1.1rem; }
+.contribute-summary-eyebrow { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint); }
+.contribute-summary-note { font-size: .78rem; line-height: 1.55; color: var(--text-faint); }
+
+.sell-form { margin-top: 8px; display: grid; gap: 18px; }
 .sell-field { display: flex; flex-direction: column; gap: 6px; }
 .sell-label { font-size: 0.82rem; font-weight: 600; color: var(--text-2, #444); }
 .sell-input {
   width: 100%;
-  padding: 11px 13px;
+  padding: 12px 14px;
   font: inherit;
   color: var(--text, #202124);
-  background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: var(--r-md, 10px);
+  background: rgba(255,255,255,.65);
+  border: 1px solid rgba(16,24,40,.09);
+  border-radius: 12px;
   box-sizing: border-box;
-  transition: border-color .15s ease;
+  box-shadow: inset 0 1px 2px rgba(16,24,40,.05);
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
 }
-.sell-input:focus { outline: none; border-color: var(--primary, #6B3FD4); }
+.sell-input:focus {
+  outline: none;
+  border-color: var(--primary, #6B3FD4);
+  background: #fff;
+  box-shadow: 0 0 0 4px var(--primary-soft), inset 0 1px 2px rgba(16,24,40,.05);
+}
 textarea.sell-input { resize: vertical; line-height: 1.5; }
+
+/* iOS-style segmented control, for the one-of-two capability choice */
+.segmented { display: inline-flex; padding: 3px; background: rgba(16,24,40,.06); border-radius: 12px; gap: 2px; }
+.segmented-btn {
+  border: none; background: transparent; cursor: pointer; font: inherit;
+  padding: .6rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 600;
+  color: var(--text-muted); transition: background-color .15s, color .15s, box-shadow .15s;
+}
+.segmented-btn-active { background: #fff; color: var(--text); box-shadow: 0 1px 4px rgba(16,24,40,.14); }

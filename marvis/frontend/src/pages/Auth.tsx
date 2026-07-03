@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { apiLogin, apiRegister, type AuthState } from '../api'
 import { BrandMark } from '../components/Sidebar'
+import BrandWord from '../components/BrandWord'
 
 interface Props {
   onAuth: (state: AuthState) => void
@@ -37,7 +38,7 @@ export default function Auth({ onAuth, onBack, initialMode = 'login' }: Props) {
       <div className="auth-card">
         <div className="auth-brand">
           <BrandMark size={44} />
-          <span className="auth-wordmark">Marvis</span>
+          <span className="auth-wordmark"><BrandWord text="Marvis" /></span>
         </div>
         <h1>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
         <p className="auth-subtitle">

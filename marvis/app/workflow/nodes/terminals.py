@@ -249,8 +249,8 @@ async def verify_failed(node_input: dict[str, Any]) -> Any:
     """Refund completion → buyer; sweep the non-refundable base → owner/broker.
 
     Phase 3 (decision Q3): base is the owner's non-refundable hiring fee, so on
-    failure it sweeps 100% → agent:owner:<id> (LISTED) or → broker (UNOWNED),
-    and the completion refunds to the buyer. The base sweep is the EXPLICIT leg
+    failure it sweeps 100% → the owner's own wallet (LISTED) or → broker
+    (UNOWNED), and the completion refunds to the buyer. The base sweep is the EXPLICIT leg
     that drains base out of escrow so escrow still settles to 0 on the fail path
     (previously base was stranded — audit §2). The broker takes no commission on
     failed work.

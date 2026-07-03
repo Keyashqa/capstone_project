@@ -56,7 +56,7 @@ class LoginRequest(BaseModel):
 class VerifyPinRequest(BaseModel):
     token: str
     pin: str
-    adk_session_id: str
+    adk_session_id: str | None = None  # None for standalone checks (e.g. wallet top-up), outside any chat/HITL flow
     interrupt_id: str = "payment_auth"
 
 
@@ -158,7 +158,9 @@ async def login(req: LoginRequest) -> dict:
     return {"user_id": user_id, "token": token, "email": req.email, "balance_cents": balance}
 
 
-# ── Verify PIN (called by React frontend's PIN modal; same for gate #1 and #2) ─
+# ── Verify PIN (called by React frontend's PIN modal; same for gate #1, gate #2,
+#    and standalone checks like the simulated bank top-up — always the same
+#    user.pin_hash, just optionally scoped to a live chat/HITL session) ───────
 
 @router.post("/auth/verify-pin")
 async def verify_pin(req: VerifyPinRequest) -> dict:
@@ -166,15 +168,16 @@ async def verify_pin(req: VerifyPinRequest) -> dict:
     if not _verify_secret(req.pin, user["pin_hash"]):
         return {"ok": False, "error": "Incorrect PIN"}
 
-    conn = get_conn()
-    try:
-        row = conn.execute(
-            "SELECT user_id FROM adk_sessions WHERE adk_session_id=?", (req.adk_session_id,)
-        ).fetchone()
-        if not row or row["user_id"] != user["id"]:
-            return {"ok": False, "error": "Session not found"}
-    finally:
-        conn.close()
+    if req.adk_session_id:
+        conn = get_conn()
+        try:
+            row = conn.execute(
+                "SELECT user_id FROM adk_sessions WHERE adk_session_id=?", (req.adk_session_id,)
+            ).fetchone()
+            if not row or row["user_id"] != user["id"]:
+                return {"ok": False, "error": "Session not found"}
+        finally:
+            conn.close()
 
     return {"ok": True}
 

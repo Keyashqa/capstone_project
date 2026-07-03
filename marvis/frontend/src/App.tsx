@@ -7,10 +7,11 @@ import Marketplace from './pages/Marketplace'
 import OwnedSkills from './pages/OwnedSkills'
 import PlatformVolume from './pages/PlatformVolume'
 import SellSkill from './pages/SellSkill'
+import ContributedSkills from './pages/ContributedSkills'
 import type { AuthState } from './api'
 import './App.css'
 
-type Page = 'landing' | 'auth' | 'wallet' | 'chat' | 'marketplace' | 'owned-skills' | 'platform' | 'sell'
+type Page = 'landing' | 'auth' | 'wallet' | 'chat' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed'
 
 const STORAGE_KEY = 'marvis_auth'
 
@@ -50,14 +51,6 @@ export default function App() {
     setPage('landing')
   }
 
-  const handleBalanceChange = (cents: number) => {
-    if (auth) {
-      const updated = { ...auth, balanceCents: cents }
-      saveAuth(updated)
-      setAuth(updated)
-    }
-  }
-
   const goToAuth = (mode: 'login' | 'register') => {
     setAuthMode(mode)
     setPage('auth')
@@ -81,7 +74,6 @@ export default function App() {
         auth={auth}
         onNavigate={setPage}
         onLogout={handleLogout}
-        onBalanceChange={handleBalanceChange}
       />
     )
   }
@@ -90,7 +82,7 @@ export default function App() {
     return (
       <Marketplace
         email={auth.email}
-        balanceCents={auth.balanceCents}
+        token={auth.token}
         onNavigate={setPage}
         onLogout={handleLogout}
       />
@@ -101,7 +93,7 @@ export default function App() {
     return (
       <OwnedSkills
         email={auth.email}
-        balanceCents={auth.balanceCents}
+        token={auth.token}
         onNavigate={setPage}
         onLogout={handleLogout}
       />
@@ -112,7 +104,7 @@ export default function App() {
     return (
       <PlatformVolume
         email={auth.email}
-        balanceCents={auth.balanceCents}
+        token={auth.token}
         onNavigate={setPage}
         onLogout={handleLogout}
       />
@@ -124,7 +116,17 @@ export default function App() {
       <SellSkill
         token={auth.token}
         email={auth.email}
-        balanceCents={auth.balanceCents}
+        onNavigate={setPage}
+        onLogout={handleLogout}
+      />
+    )
+  }
+
+  if (page === 'contributed') {
+    return (
+      <ContributedSkills
+        email={auth.email}
+        token={auth.token}
         onNavigate={setPage}
         onLogout={handleLogout}
       />

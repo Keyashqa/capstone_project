@@ -1,14 +1,20 @@
-type NavPage = 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell'
+import { useEffect, useState } from 'react'
+import { apiGetWallet } from '../api'
+import { onBalanceChanged } from '../balanceBus'
+import BrandWord from './BrandWord'
+
+type NavPage = 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed'
 
 interface Props {
   active: NavPage
   email: string
-  balanceCents?: number
+  token: string
   onNavigate: (page: NavPage) => void
   onLogout: () => void
 }
 
 const fmt$ = (c: number) => `$${(c / 100).toFixed(2)}`
+const BALANCE_POLL_MS = 5000
 
 export function BrandMark({ size = 30 }: { size?: number }) {
   return (
@@ -84,14 +90,42 @@ function SellIcon() {
   )
 }
 
-export default function Sidebar({ active, email, balanceCents, onNavigate, onLogout }: Props) {
+function ContributedIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M7 20V10M12 20V4M17 20v-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="7" cy="7" r="2.2" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  )
+}
+
+export default function Sidebar({ active, email, token, onNavigate, onLogout }: Props) {
   const initial = (email || '?').trim().charAt(0).toUpperCase()
+  const [balanceCents, setBalanceCents] = useState<number | undefined>(undefined)
+
+  // Always fetch live — a stale balance baked into login-time state was the
+  // source of MPay vs. Chat showing two different numbers. Polling also picks
+  // up balance changes made without leaving the current page (e.g. mid-chat
+  // hire payments).
+  useEffect(() => {
+    if (!token) return
+    let cancelled = false
+    const refresh = () => {
+      apiGetWallet(token)
+        .then(d => { if (!cancelled) setBalanceCents(d.balanceCents) })
+        .catch(() => { /* keep last-known value on transient failure */ })
+    }
+    refresh()
+    const id = setInterval(refresh, BALANCE_POLL_MS)
+    const unsubscribe = onBalanceChanged(refresh)
+    return () => { cancelled = true; clearInterval(id); unsubscribe() }
+  }, [token])
 
   return (
     <aside className="sidebar">
       <button className="brand" onClick={() => onNavigate('chat')}>
         <BrandMark />
-        <span className="brand-name">Marvis</span>
+        <span className="brand-name"><BrandWord text="Marvis" /></span>
       </button>
 
       <nav className="side-nav">
@@ -107,7 +141,7 @@ export default function Sidebar({ active, email, balanceCents, onNavigate, onLog
           onClick={() => onNavigate('marketplace')}
         >
           <MarketIcon />
-          <span className="side-label">Marketplace</span>
+          <span className="side-label">Skills <BrandWord text="Marketplace" /></span>
         </button>
         <button
           className={`side-item${active === 'owned-skills' ? ' side-item-active' : ''}`}
@@ -121,7 +155,14 @@ export default function Sidebar({ active, email, balanceCents, onNavigate, onLog
           onClick={() => onNavigate('sell')}
         >
           <SellIcon />
-          <span className="side-label">Sell a Skill</span>
+          <span className="side-label">Contribute Skills</span>
+        </button>
+        <button
+          className={`side-item${active === 'contributed' ? ' side-item-active' : ''}`}
+          onClick={() => onNavigate('contributed')}
+        >
+          <ContributedIcon />
+          <span className="side-label">Contributed Skills</span>
         </button>
         <button
           className={`side-item${active === 'platform' ? ' side-item-active' : ''}`}
@@ -135,7 +176,7 @@ export default function Sidebar({ active, email, balanceCents, onNavigate, onLog
           onClick={() => onNavigate('wallet')}
         >
           <WalletIcon />
-          <span className="side-label">MPay</span>
+          <span className="side-label"><BrandWord text="MPay" /></span>
         </button>
       </nav>
 
@@ -144,7 +185,7 @@ export default function Sidebar({ active, email, balanceCents, onNavigate, onLog
           <button className="side-balance" onClick={() => onNavigate('wallet')} title="MPay balance">
             <span className="balance-pill-dot" />
             {fmt$(balanceCents)}
-            <span className="side-balance-label">MPay balance</span>
+            <span className="side-balance-label"><BrandWord text="MPay" /> balance</span>
           </button>
         )}
         <div className="side-account">

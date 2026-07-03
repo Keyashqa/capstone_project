@@ -5,12 +5,12 @@ import {
 } from '../api'
 import A2uiRenderer from '../components/A2uiRenderer'
 import Sidebar, { BrandMark } from '../components/Sidebar'
+import { notifyBalanceChanged } from '../balanceBus'
 
 interface Props {
   auth: AuthState
-  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell') => void
+  onNavigate: (page: 'chat' | 'wallet' | 'marketplace' | 'owned-skills' | 'platform' | 'sell' | 'contributed') => void
   onLogout: () => void
-  onBalanceChange?: (cents: number) => void
 }
 
 const uid = () => Math.random().toString(36).slice(2)
@@ -193,6 +193,10 @@ export default function Chat({ auth, onNavigate, onLogout }: Props) {
             response: { result: 'confirmed' },
           },
         }])
+        // A confirmed PIN gate just moved money (escrow hold or payout release)
+        // — refresh the sidebar balance immediately instead of waiting for
+        // its next poll tick.
+        notifyBalanceChanged()
       } else {
         // reject / cancel
         const capturedHitl = hitl
@@ -216,7 +220,7 @@ export default function Chat({ auth, onNavigate, onLogout }: Props) {
       <Sidebar
         active="chat"
         email={auth.email}
-        balanceCents={auth.balanceCents}
+        token={auth.token}
         onNavigate={onNavigate}
         onLogout={onLogout}
       />

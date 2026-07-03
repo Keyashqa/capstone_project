@@ -29,7 +29,7 @@ BROKER_ACCOUNT = "broker"
 # Ledger `reason` strings, chosen so get_platform_stats can group revenue by them
 # (plan3.md §P3-4.4). Broker revenue = SUM(account_id='broker'); commission-only =
 # ... AND reason='payout_commission'.
-REASON_OWNER = "payout_owner"            # base + owner's share of completion → agent:owner:<id>
+REASON_OWNER = "payout_owner"            # base + owner's share of completion → owner's own wallet
 REASON_COMMISSION = "payout_commission"  # broker's commission on a LISTED skill's completion
 REASON_BROKER = "payout_broker"          # broker keeps the whole payout of an UNOWNED skill
 

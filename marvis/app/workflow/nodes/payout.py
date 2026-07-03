@@ -197,9 +197,9 @@ async def approve_payout(ctx: Context, node_input: dict[str, Any]):
 async def pay_completion(node_input: dict[str, Any]) -> Any:
     """Release escrow:{task_id} to the owner + broker via the Phase 3 split.
 
-    LISTED skill (owner_account set): base 100% + completion 90% → agent:owner:<id>,
-      completion 10% → broker (floor commission on completion, derive owner by
-      subtraction — penny-exact, escrow drains to 0).
+    LISTED skill (owner_account set): base 100% + completion 90% → the owner's
+      own spendable wallet, completion 10% → broker (floor commission on
+      completion, derive owner by subtraction — penny-exact, escrow drains to 0).
     UNOWNED skill (owner_account None): 100% (base + completion) → broker.
     (plan3.md §P3-4; decisions Q1/Q3. The old flat agent:<agent_name> payout is
     gone for listed/unowned skills.)

@@ -254,9 +254,10 @@ def get_platform_stats(feed_limit: int = 50) -> dict:
         # a Phase 2 skill-builder commission both flow through the same node, so this
         # is the total volume ever committed to a hire, platform-wide.
         total_volume_cents = _sum("reason = 'hire_escrow' AND delta_cents > 0")
-        # Phase 3: agent:owner:<id> earnings share the 'agent:%' prefix but are
-        # OWNER earnings, not specialist earnings — exclude them so the specialist
-        # aggregate isn't double-counted the moment an owner is paid (plan3.md §P3-8).
+        # Owner earnings now land in the owner's own <user_id> wallet (not an
+        # 'agent:%'-prefixed account), so they're naturally excluded here. The
+        # NOT LIKE clause stays only for backward compat with any pre-migration
+        # 'agent:owner:%' rows written before this account moved to the wallet.
         total_paid_to_agents_cents = _sum(
             "account_id LIKE 'agent:%' AND account_id NOT LIKE 'agent:owner:%' AND delta_cents > 0"
         )
@@ -278,12 +279,15 @@ def get_platform_stats(feed_limit: int = 50) -> dict:
         commission_cents = _sum(
             "account_id = 'broker' AND reason = 'payout_commission' AND delta_cents > 0"
         )
-        # Per-owner earnings (base + 90% completion of every LISTED hire), the
-        # agent:owner:<id> rows the split writes — kept separate from specialists.
+        # Per-owner earnings (base + 90% completion of every LISTED hire). These
+        # land straight in the owner's own <user_id> wallet now (not a distinct
+        # 'agent:owner:%' account), so they're identified by `reason`, not by
+        # account prefix — this also still picks up any pre-migration
+        # 'agent:owner:%' rows (removeprefix below is a no-op on the new shape).
         per_owner_rows = conn.execute(
             """SELECT account_id, SUM(delta_cents) AS earned
                  FROM ledger
-                WHERE account_id LIKE 'agent:owner:%' AND delta_cents > 0
+                WHERE reason = 'payout_owner' AND delta_cents > 0
                 GROUP BY account_id
                 ORDER BY earned DESC"""
         ).fetchall()
@@ -325,5 +329,27 @@ def get_platform_stats(feed_limit: int = 50) -> dict:
             ],
             "feed": [dict(r) for r in feed_rows],
         }
+    finally:
+        conn.close()
+
+
+def get_skill_earnings(owner_id: str) -> dict[str, dict]:
+    """Per-skill hire count + earnings for one owner, keyed by skill_id.
+
+    Joins the ledger to job_receipts on reference_id == task_id (every payout
+    leg's reference_id is the task_id — escrow/operations.py:release_from_escrow)
+    so a seller can see which of THEIR listed skills actually got hired, without
+    a new column anywhere — reuses the existing double-entry rows + receipts."""
+    conn = get_conn()
+    try:
+        rows = conn.execute(
+            """SELECT jr.skill_id AS skill_id, COUNT(*) AS hires, SUM(l.delta_cents) AS earned
+                 FROM ledger l
+                 JOIN job_receipts jr ON jr.task_id = l.reference_id
+                WHERE l.account_id = ? AND l.reason = 'payout_owner' AND l.delta_cents > 0
+                GROUP BY jr.skill_id"""
+            , (owner_id,),
+        ).fetchall()
+        return {r["skill_id"]: {"hires": r["hires"], "earned_cents": r["earned"]} for r in rows}
     finally:
         conn.close()

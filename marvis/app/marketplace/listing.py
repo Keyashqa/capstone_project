@@ -27,9 +27,11 @@ from app.marketplace.skill_registry import get_registry
 
 
 def owner_account_for(owner_id: str) -> str:
-    """The dedicated, non-spendable earnings account a listed skill pays into
-    (decision #1). Distinct from the owner's spendable <user_id> wallet."""
-    return f"agent:owner:{owner_id}"
+    """The account a listed skill's earnings pay into — the owner's own
+    spendable <user_id> wallet (the SAME account top-ups and hires use). Skill
+    sales deposit straight into it, so earnings show up immediately in the
+    seller's MPay balance and transaction history, no separate cash-out step."""
+    return owner_id
 
 
 def _record_ownership(owner_id: str, skill_id: str, owner_account: str) -> None:

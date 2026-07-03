@@ -1,11 +1,11 @@
 {
   "skill_id": "skill-medium-post-writer",
-  "owner_id": "28d9932f648842e1",
-  "owner_account": "agent:owner:28d9932f648842e1",
+  "owner_id": "852b7ce50ad64c52",
+  "owner_account": "852b7ce50ad64c52",
   "agent_name": "MediumPostWriter",
   "display_name": "Medium Post Writer",
   "version": "1.0.0",
-  "description": "Writes engaging Twitter/X posts and saves them to Google Docs. For creating tweets and short-form social posts for Twitter.",
+  "description": "Writes medium platform posts",
   "specialties": [
     "medium",
     "writer"
@@ -24,7 +24,7 @@
   ],
   "pricing": {
     "currency": "USD",
-    "base_fee_cents": 50,
-    "completion_fee_cents": 100
+    "base_fee_cents": 1050,
+    "completion_fee_cents": 1000
   }
 }
