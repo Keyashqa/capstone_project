@@ -4,7 +4,7 @@ MODEL = "gemma2:2b"
 
 def timed(label, messages, fmt=None):
     print(f"\n--- {label} ---")
-    t0 = time.time()
+    t0 = time.time()https://github.com/Keyashqa/capstone_project.git
     resp = ollama.chat(
         model=MODEL,
         messages=messages,
