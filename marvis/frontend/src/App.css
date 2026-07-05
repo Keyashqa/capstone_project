@@ -601,6 +601,15 @@ section h3 {
 .a2ui-caption { font-size: .78rem;  color: var(--text-muted); line-height: 1.45; display: block; }
 .a2ui-label   { font-size: .72rem;  font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: .07em; display: block; }
 
+.a2ui-link {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: .4rem;
+  background: var(--green-bg); border: 1px solid #BEE3C8; color: var(--green);
+  text-decoration: none; font-size: .82rem; font-weight: 700;
+  padding: .5rem .85rem; border-radius: var(--r-md); transition: background .12s;
+}
+.a2ui-link:hover { background: #D6EEDD; }
+
 .a2ui-divider { border: none; border-top: 1px solid var(--border-light); width: 100%; margin: .25rem 0; }
 .a2ui-icon { font-size: 1rem; line-height: 1; display: inline-block; }
 

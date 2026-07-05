@@ -137,8 +137,6 @@ async def intake_task(node_input: Any) -> Any:
         },
         route="parsed",
         content=_content(
-            f"Task parsed:\n  type: {parsed['type']}\n"
-            f"  inputs: {json.dumps(parsed['inputs'], indent=2)}\n"
-            f"  criteria: {len(parsed['acceptance_criteria'])} checks"
+            f"Task parsed: {parsed['type']} · {len(parsed['acceptance_criteria'])} checks"
         ),
     )

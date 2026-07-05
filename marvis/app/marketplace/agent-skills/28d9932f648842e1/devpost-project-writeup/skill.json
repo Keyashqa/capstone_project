@@ -1,0 +1,32 @@
+{
+  "skill_id": "skill-devpost-project-writeup",
+  "owner_id": "28d9932f648842e1",
+  "owner_account": "28d9932f648842e1",
+  "agent_name": "DevpostProjectWriteup",
+  "display_name": "Devpost Project Writeup",
+  "version": "1.0.0",
+  "description": "Writes a hackathon project writeup in Devpost's canonical section format \u2014 inspiration through what's next \u2014 clear and judge-friendly.",
+  "specialties": [
+    "devpost",
+    "project",
+    "writeup"
+  ],
+  "model": "ollama/gemma2:2b",
+  "match_keywords": [
+    "devpost",
+    "project",
+    "writeup"
+  ],
+  "required_capabilities": [
+    {
+      "mcp_server": "gdocs",
+      "tool_name": "create_doc",
+      "why": "save the produced document"
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 2250,
+    "completion_fee_cents": 1200
+  }
+}

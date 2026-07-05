@@ -1,0 +1,34 @@
+{
+  "skill_id": "skill-linkedin-product-launch-post",
+  "owner_id": "28d9932f648842e1",
+  "owner_account": "28d9932f648842e1",
+  "agent_name": "LinkedinProductLaunchPost",
+  "display_name": "LinkedIn Product Launch Post",
+  "version": "1.0.0",
+  "description": "Writes a LinkedIn launch post with a scroll-stopping hook, a short story arc, and a clear call to action \u2014 in the native LinkedIn rhythm.",
+  "specialties": [
+    "linkedin",
+    "product",
+    "launch",
+    "writer"
+  ],
+  "model": "ollama/gemma2:2b",
+  "match_keywords": [
+    "linkedin",
+    "product",
+    "launch",
+    "writer"
+  ],
+  "required_capabilities": [
+    {
+      "mcp_server": "gdocs",
+      "tool_name": "create_doc",
+      "why": "save the produced document"
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 1050,
+    "completion_fee_cents": 1200
+  }
+}

@@ -70,9 +70,6 @@ async def discover_specialists(node_input: dict[str, Any]) -> Any:
         )
 
     all_candidates = market_candidates + owned_candidates
-    cards_summary = "\n".join(
-        f"  • {c.display_name} ({c.skill_id}) — {c.description}" for c in all_candidates
-    )
     # Phase 3: carry (owner_id, skill_id) — the registry is composite-keyed, so a
     # non-"marvis" seller's listing (e.g. alice's) must be resolved WITH its owner
     # in select_specialist, else registry.get defaults to "marvis" and KeyErrors
@@ -84,7 +81,7 @@ async def discover_specialists(node_input: dict[str, Any]) -> Any:
             "owned_candidate_skill_ids": [[c.owner_id, c.skill_id] for c in owned_candidates],
         },
         route="found",
-        content=_content(f"Found {len(all_candidates)} specialist(s):\n{cards_summary}"),
+        content=_content(f"Found {len(all_candidates)} matching specialist(s)"),
     )
 
 
@@ -142,7 +139,6 @@ def _custom_score(card: SkillCard, goal_nl: str) -> int:
 def _select_output(node_input: dict, chosen: SkillCard, store: str) -> Event:
     """Build the select_specialist success Event for a chosen card."""
     agent_card = AgentCard.from_skill_card(chosen)
-    kind = "custom" if chosen.match_keywords else "platform"
     return Event(
         route=store,  # "market" (rent / listed-earns) or "owned" (free, self-issued)
         output={
@@ -154,9 +150,8 @@ def _select_output(node_input: dict, chosen: SkillCard, store: str) -> Event:
             "skill_card": chosen.model_dump(),
         },
         content=_content(
-            f"Selected: {chosen.display_name} ({chosen.agent_name}) [{store}/{kind}]\n"
-            f"  Base fee: ${chosen.pricing.base_fee_cents / 100:.2f}  "
-            f"Completion fee: ${chosen.pricing.completion_fee_cents / 100:.2f}"
+            f"Selected: {chosen.display_name} · base ${chosen.pricing.base_fee_cents / 100:.2f} "
+            f"+ completion ${chosen.pricing.completion_fee_cents / 100:.2f}"
         ),
     )
 

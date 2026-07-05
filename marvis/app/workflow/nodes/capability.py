@@ -94,9 +94,7 @@ async def grant_capability(node_input: dict[str, Any]) -> Any:
             "granted_tool": tool_name,
         },
         content=_content(
-            f"Capability grant minted: {grant.grant_id}\n"
-            f"  Tool: {tool_name} (agent: {agent_name})\n"
-            f"  TTL: {GRANT_TTL_SECONDS}s  max_calls: {limits.max_calls_total}"
+            f"Capability grant minted: {grant.grant_id}"
         ),
     )
 

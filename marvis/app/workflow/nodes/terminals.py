@@ -16,7 +16,7 @@ from typing import Any
 from google.adk.events.event import Event
 from google.genai import types as genai_types
 
-from app.receipts import save_job_receipt
+from app.receipts import GDOCS_URL, save_job_receipt
 
 CATALOG_ID = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json"
 
@@ -42,21 +42,21 @@ def _build_receipt_a2ui(
 ) -> list[dict]:
     surface_id = f"receipt-{task_id[:8]}"
     doc_components: list[dict] = []
+    doc_top_ids: list[str] = []
     if doc_id:
-        doc_components = [
-            {"id": "doc-div", "component": "Divider"},
-            {"id": "doc-row", "component": "Row", "children": ["doc-icon", "doc-col"],
-             "align": "center", "spacing": 10},
-            {"id": "doc-icon", "component": "Icon", "name": "doc",
-             "style": {"color": "var(--green)", "fontSize": "1.3rem"}},
-            {"id": "doc-col", "component": "Column",
-             "children": ["doc-lbl", "doc-id"], "spacing": 2},
-            {"id": "doc-lbl", "component": "Text", "text": "Google Doc created",
-             "variant": "label"},
-            {"id": "doc-id",  "component": "Text",
-             "text": "Open it from MPay → this payment",
-             "variant": "caption", "style": {"color": "var(--green)"}},
-        ]
+        doc_top_ids = ["doc-div", "doc-link"]
+        if doc_id != "created":  # real doc id → direct clickable Google Docs link
+            doc_components = [
+                {"id": "doc-div", "component": "Divider"},
+                {"id": "doc-link", "component": "Link",
+                 "text": "Open in Google Docs ↗", "url": GDOCS_URL.format(doc_id=doc_id)},
+            ]
+        else:  # extraction fell back — no usable link, so just confirm the save
+            doc_components = [
+                {"id": "doc-div", "component": "Divider"},
+                {"id": "doc-link", "component": "Text", "text": "Google Doc created",
+                 "variant": "caption", "style": {"color": "var(--green)"}},
+            ]
 
     meta_rows = [
         {"id": "booking-row", "component": "Row",
@@ -90,11 +90,13 @@ def _build_receipt_a2ui(
                    "border": "1px solid var(--border-light)", "marginTop": "4px"}},
     ]
 
+    # Only the top-level container ids attach to the column; ids nested inside a
+    # Row/Column must NOT be repeated here or they render 2–3× (once per parent
+    # plus once directly).
     col_children = (
-        ["title", "status-row", "div-1"]
-        + [c["id"] for c in meta_rows]
-        + [c["id"] for c in doc_components]
-        + [c["id"] for c in content_section]
+        ["title", "status-row", "div-1", "booking-row", "agent-row", "paid-row"]
+        + doc_top_ids
+        + ["content-div", "output-lbl", "output-preview"]
     )
 
     components: list[dict] = [

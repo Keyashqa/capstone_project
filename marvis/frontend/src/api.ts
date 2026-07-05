@@ -245,7 +245,7 @@ export type A2uiTextValue =
 
 export interface A2uiComponent {
   id: string
-  component: 'Column' | 'Row' | 'Card' | 'Text' | 'Divider' | 'Button' | 'TextField' | 'Icon'
+  component: 'Column' | 'Row' | 'Card' | 'Text' | 'Divider' | 'Button' | 'TextField' | 'Icon' | 'Link'
   // layout
   children?: string[]
   child?: string
@@ -257,6 +257,8 @@ export interface A2uiComponent {
   // Text
   text?: A2uiTextValue
   variant?: string
+  // Link
+  url?: A2uiTextValue
   // TextField
   label?: string
   value?: { path: string }

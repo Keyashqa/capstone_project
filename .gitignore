@@ -36,8 +36,10 @@ token*.pickle
 .google_workspace_mcp/
 **/credentials/*.json
 
-# Per-user JWK key pairs (generated at runtime)
+# Per-user JWK key pairs (generated at runtime) — anchored AND nested
 app/_keys/*.json
+**/_keys/*.json
+**/app/.adk/
 broker_server/_keys/*.json
 
 # Databases (runtime state)
@@ -62,3 +64,6 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+.claude
+claude

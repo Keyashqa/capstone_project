@@ -132,6 +132,23 @@ export default function A2uiRenderer({ surfaces, onEvent, disabled, loading }: P
       case 'Divider':
         return <hr key={id} className="a2ui-divider" style={inlineStyle} />
 
+      case 'Link': {
+        const text = String(resolve(comp.text ?? ''))
+        const url = String(resolve(comp.url ?? ''))
+        return (
+          <a
+            key={id}
+            className="a2ui-link"
+            style={inlineStyle}
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {text}
+          </a>
+        )
+      }
+
       case 'Icon': {
         const iconMap: Record<string, IconName> = {
           person: 'user', check: 'check', star: 'star', doc: 'doc', lock: 'lock', warning: 'warning',

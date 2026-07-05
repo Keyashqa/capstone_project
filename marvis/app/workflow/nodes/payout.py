@@ -37,33 +37,17 @@ def _a2ui(messages: list[dict]) -> genai_types.Content:
 def _build_payout_a2ui(
     agent_name: str,
     advisory_score: int,
-    output_preview: str,
     completion_cents: int,
-    doc_id: str | None,
 ) -> list[dict]:
     surface_id = f"payout-{agent_name[:8]}"
     score_stars = "★" * min(advisory_score, 10) + "☆" * max(0, 10 - advisory_score)
     score_color = "var(--green)" if advisory_score >= 7 else "var(--gold)" if advisory_score >= 4 else "var(--red)"
 
-    doc_components: list[dict] = []
-    if doc_id:
-        doc_components = [
-            {"id": "doc-row", "component": "Row", "children": ["doc-icon", "doc-text"],
-             "align": "center", "spacing": 6},
-            {"id": "doc-icon", "component": "Icon", "name": "doc",
-             "style": {"color": "var(--green)"}},
-            {"id": "doc-text", "component": "Text", "text": f"Google Doc: {doc_id}",
-             "variant": "caption", "style": {"color": "var(--green)", "fontWeight": "600"}},
-        ]
-
-    preview_children = ["preview-lbl", "preview-text"] + (["doc-row"] if doc_id else [])
-
     components: list[dict] = [
         {"id": "root", "component": "Card", "child": "main-col",
          "style": {"maxWidth": "480px"}},
         {"id": "main-col", "component": "Column", "children": [
-            "hdr-col", "score-row", "div-1",
-            "preview-col", "div-2", "fee-row",
+            "hdr-col", "score-row", "div-1", "fee-row",
             "pin-field", "actions-row",
         ], "spacing": 14, "align": "start"},
 
@@ -92,19 +76,6 @@ def _build_payout_a2ui(
          "variant": "body", "style": {"color": score_color, "fontSize": "1rem", "letterSpacing": "2px"}},
 
         {"id": "div-1", "component": "Divider"},
-
-        # Output preview
-        {"id": "preview-col", "component": "Column",
-         "children": preview_children, "spacing": 6, "align": "start"},
-        {"id": "preview-lbl", "component": "Text", "text": "Output", "variant": "label"},
-        {"id": "preview-text", "component": "Text", "text": output_preview[:280],
-         "variant": "body",
-         "style": {"backgroundColor": "var(--surface)", "borderRadius": "8px",
-                   "padding": "10px 12px", "fontStyle": "italic",
-                   "border": "1px solid var(--border-light)"}},
-        *doc_components,
-
-        {"id": "div-2", "component": "Divider"},
 
         # Completion fee
         {"id": "fee-row", "component": "Row",
@@ -170,9 +141,7 @@ async def approve_payout(ctx: Context, node_input: dict[str, Any]):
         yield Event(content=_a2ui(_build_payout_a2ui(
             agent_name=result.get("agent_name", "Agent"),
             advisory_score=verification.get("advisory_score", 0),
-            output_preview=result.get("output", ""),
             completion_cents=completion_cents,
-            doc_id=result.get("doc_id"),
         )))
         yield RequestInput(interrupt_id="payout_auth", message="Enter PIN to approve payout")
         return

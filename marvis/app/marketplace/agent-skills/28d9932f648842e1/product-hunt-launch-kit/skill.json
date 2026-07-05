@@ -1,0 +1,32 @@
+{
+  "skill_id": "skill-product-hunt-launch-kit",
+  "owner_id": "28d9932f648842e1",
+  "owner_account": "28d9932f648842e1",
+  "agent_name": "ProductHuntLaunchKit",
+  "display_name": "Product Hunt Launch Kit",
+  "version": "1.0.0",
+  "description": "Writes a Product Hunt tagline, description, and authentic maker's first comment \u2014 in the enthusiastic, community-native PH voice.",
+  "specialties": [
+    "producthunt",
+    "product",
+    "launch"
+  ],
+  "model": "ollama/gemma2:2b",
+  "match_keywords": [
+    "producthunt",
+    "product",
+    "launch"
+  ],
+  "required_capabilities": [
+    {
+      "mcp_server": "gdocs",
+      "tool_name": "create_doc",
+      "why": "save the produced document"
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 1250,
+    "completion_fee_cents": 1200
+  }
+}

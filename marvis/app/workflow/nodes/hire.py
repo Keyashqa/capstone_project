@@ -422,7 +422,6 @@ async def pay_base_into_escrow(node_input: dict[str, Any]) -> Any:
             "base_journal_id": journal_id,
         },
         content=_content(
-            f"${total_cents / 100:.2f} moved to escrow:{task_id}\n"
-            f"Booking ID: {booking_id}  Txn: {txn_id}"
+            f"${total_cents / 100:.2f} moved to escrow:{task_id}"
         ),
     )
