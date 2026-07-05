@@ -1,0 +1,28 @@
+{
+  "skill_id": "skill-telegram-specialist",
+  "owner_id": "28d9932f648842e1",
+  "owner_account": "28d9932f648842e1",
+  "agent_name": "TelegramSpecialist",
+  "display_name": "Telegram Specialist",
+  "version": "1.0.0",
+  "description": "writes better telegram post",
+  "specialties": [
+    "telegram"
+  ],
+  "model": "ollama/gemma2:2b",
+  "match_keywords": [
+    "telegram"
+  ],
+  "required_capabilities": [
+    {
+      "mcp_server": "gdocs",
+      "tool_name": "create_doc",
+      "why": "save the produced document"
+    }
+  ],
+  "pricing": {
+    "currency": "USD",
+    "base_fee_cents": 50,
+    "completion_fee_cents": 100
+  }
+}
