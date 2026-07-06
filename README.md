@@ -19,19 +19,69 @@ capstone_project/
 
 ## Quick start
 
-See **[marvis/README.md](marvis/README.md)** for the full setup guide.
+See **[marvis/README.md](marvis/README.md)** for the full setup guide (architecture, protocols, project structure, demo walkthrough). The short version:
 
-The short version:
+### 1. Clone
+
 ```bash
-cd marvis
-uv sync                    # install Python deps
-cp .env.example .env       # fill in Google OAuth credentials
-./run_marvis.sh            # terminal 1: agent server :8000
-./run_broker.sh            # terminal 2: broker :8002
-./run_frontend.sh          # terminal 3: frontend :5173
+git clone https://github.com/Keyashqa/capstone_project.git
+cd capstone_project/marvis
 ```
 
-Then open `http://localhost:5173` and type:
+### 2. Prerequisites
+
+| Requirement | Version | Notes |
+|---|---|---|
+| Python | 3.11 – 3.13 | `python3 --version` |
+| [uv](https://docs.astral.sh/uv/) | latest | `pip install uv` |
+| Node.js | 18+ | for the React frontend |
+| [Ollama](https://ollama.com) | latest | local LLM, zero API keys |
+| Google Cloud project | — | OAuth client for Docs + Drive APIs |
+
+```bash
+ollama pull gemma2:2b
+```
+
+### 3. Install dependencies
+
+```bash
+uv sync                                # Python deps (from marvis/)
+cd frontend && npm install && cd ..    # frontend deps
+```
+
+### 4. Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and fill in Google OAuth credentials (create an OAuth 2.0 **Desktop app** client at [console.cloud.google.com](https://console.cloud.google.com) with the Docs + Drive APIs enabled):
+
+```ini
+GOOGLE_OAUTH_CLIENT_ID=your_client_id.apps.googleusercontent.com
+GOOGLE_OAUTH_CLIENT_SECRET=GOCSPX-your_secret
+USER_GOOGLE_EMAIL=your@gmail.com
+```
+
+### 5. One-time Google OAuth consent
+
+```bash
+cd ../mcp-test
+python create_doc.py
+cd ../marvis
+```
+
+A browser tab opens → sign in → grant Docs + Drive access → the token is cached to `~/.google_workspace_mcp/credentials/`. You won't be prompted again.
+
+### 6. Launch (3 terminals, all from `marvis/`)
+
+```bash
+./run_marvis.sh            # terminal 1: agent server :8000
+./run_broker.sh             # terminal 2: broker :8002
+./run_frontend.sh           # terminal 3: frontend :5173
+```
+
+Then open `http://localhost:5173`, register/log in (any username + password + 4-digit PIN), top up your wallet, and type:
 > Write a tweet about my Marvis launch and save it as a Twitter script in Google Docs.
 
 ## What Marvis demonstrates
