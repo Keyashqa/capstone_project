@@ -9,12 +9,15 @@ capstone_project/
 ├── marvis/                        ← MAIN PROJECT (start here)
 │   └── README.md                  Full setup, architecture, and demo guide
 ├── adk_ucp_ap2_working_prototype/ ← Reference: ADK + UCP + AP2 integration spike
-│   └── ucp-commerce-agent/        Validated AP2 payment + CartMandate patterns
+│   ├── ucp-commerce-agent/        Validated AP2 payment + CartMandate patterns
+│   └── ucp-merchant-server/       Reference UCP merchant endpoint
 ├── mcp-test/                      ← Reference: Google Workspace MCP integration test
 │   ├── google_workspace_mcp/      Workspace MCP server (submodule/install)
 │   └── create_doc.py              Working create_doc + populate flow (OAuth reference)
-├── plan.md                        Original implementation plan (M0–M11)
-└── dump.txt                       Tutorial / demo walkthrough transcript
+└── plan-audit/                    Original implementation plan (M0–M11) + audit notes
+    ├── plan.md / plan2.md / plan3.md
+    ├── audit.md
+    └── dump.txt                    Tutorial / demo walkthrough transcript
 ```
 
 ## Quick start
@@ -65,9 +68,13 @@ USER_GOOGLE_EMAIL=your@gmail.com
 
 ### 5. One-time Google OAuth consent
 
+`mcp-test/create_doc.py` needs the `mcp` package, which requires Python ≥3.10 —
+your system `python3` may be older, so run it through `uv` with an explicit
+interpreter instead of the bare `python`/`python3` command:
+
 ```bash
 cd ../mcp-test
-python create_doc.py
+uv run --python 3.11 --with mcp --with python-dotenv --with requests create_doc.py
 cd ../marvis
 ```
 
@@ -80,6 +87,11 @@ A browser tab opens → sign in → grant Docs + Drive access → the token is c
 ./run_broker.sh             # terminal 2: broker :8002
 ./run_frontend.sh           # terminal 3: frontend :5173
 ```
+
+> A fourth process — a standalone MCP proxy (:8003) for scoped tool grant
+> enforcement — was designed but never built (`marvis/proxy_server/` is an
+> unused stub). Enforcement happens in-process instead, so only the three
+> processes above need to run. See [ARCHITECTURE.md](marvis/ARCHITECTURE.md) for details.
 
 Then open `http://localhost:5173`, register/log in (any username + password + 4-digit PIN), top up your wallet, and type:
 > Write a tweet about my Marvis launch and save it as a Twitter script in Google Docs.

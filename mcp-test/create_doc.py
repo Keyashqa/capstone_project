@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-load_dotenv(dotenv_path="google_workspace_mcp/.env")
+load_dotenv(dotenv_path="../marvis/.env")
 
 server_params = StdioServerParameters(
     command="uv",

@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /home/karthikeyan/Desktop/Trisys/cap/capstone_project/mcp-test/.venv
+set -gx VIRTUAL_ENV /home/karthikeyan/Desktop/Trisys/cap/cap_clone/capstone_project/mcp-test/.venv
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH
